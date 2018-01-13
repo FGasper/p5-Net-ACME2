@@ -2,6 +2,7 @@
 .travis.yml
 Changes
 LICENSE
+MANIFEST
 Makefile.PL
 examples/dns-01.pl
 examples/http-01.pl
