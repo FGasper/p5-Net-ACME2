@@ -140,7 +140,7 @@ user. PEM or DER format.
 Saves a round-trip to the ACME2 server, so you should give this
 if you have it.
 
-=item * <directory> - Optional. A hash reference to use as the
+=item * C<directory> - Optional. A hash reference to use as the
 directory contents. Saves a round-trip to the ACME2 server, but there’s
 no built-in logic to determine when the cache goes invalid. Caveat
 emptor.
