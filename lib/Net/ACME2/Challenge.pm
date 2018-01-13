@@ -4,14 +4,14 @@ package Net::ACME2::Challenge;
 
 =head1 NAME
 
-Net::ACME2::Order
+Net::ACME2::Challenge
 
 =head1 DESCRIPTION
 
 The ACME Challenge object.
 
 (NB: The specification doesn’t seem to define this as a resource
-per se.)
+per se .. oversight?)
 
 Note that C<http-01> challenges use L<Net::ACME2::Challenge::http_01>.
 
@@ -52,37 +52,5 @@ These provide text strings as defined in the ACME specification.
 =back
 
 =cut
-
-#my $ERROR_CLASS;
-#
-#BEGIN {
-#    $ERROR_CLASS = 'Net::ACME2::Error';
-#}
-#
-#sub new {
-#    my ( $class, %opts ) = @_;
-#
-#    if ( $opts{'error'} && !Net::ACME2::Utils::thing_isa($opts{'error'}, $ERROR_CLASS) ) {
-#        die Net::ACME2::X->create( 'InvalidParameter', "“error” must be an instance of “$ERROR_CLASS”, not “$opts{'error'}”!" );
-#    }
-#
-#    return $class->SUPER::new( %opts );
-#}
-
-#sub set_status {
-#    my ($self, $value) = @_;
-#
-#    $self->{'_status'} = $value;
-#
-#    return $self;
-#}
-#
-#sub set_validated {
-#    my ($self, $value) = @_;
-#
-#    $self->{'_validated'} = $value;
-#
-#    return $self;
-#}
 
 1;
