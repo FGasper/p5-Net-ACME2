@@ -4,7 +4,7 @@ package Net::ACME2::HTTP;
 
 =head1 NAME
 
-Net::ACME2::HTTP - transport logic for C<Net::ACME>.
+Net::ACME2::HTTP - transport logic for C<Net::ACME2>.
 
 =head1 SYNOPSIS
 
@@ -21,11 +21,7 @@ Net::ACME2::HTTP - transport logic for C<Net::ACME>.
 =head1 DESCRIPTION
 
 This module handles communication with an ACME server at the HTTP level.
-It handles the wrapping of POSTs in JWSes (JSON Wed Signatures).
-
-Failure responses prompt exceptions. This includes cases like HTTP 409
-from “new-reg”, which maybe isn’t an B<error> case so much as just
-something to accommodate.
+It handles the wrapping of POSTs in JWSes (JSON Web Signatures).
 
 =cut
 
@@ -131,7 +127,7 @@ sub _request {
 
     eval { $resp = $self->_ua_request( $type, @args ); };
 
-    if ($@) {
+    if (ref $@) {
         my $exc = $@;
 
         if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {

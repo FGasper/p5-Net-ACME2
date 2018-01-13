@@ -102,9 +102,11 @@ sub run {
 sub _get_domains {
     my ($self) = @_;
 
+    print $/;
+
     my @domains;
     while (1) {
-        print "$/Enter a domain for the certificate (or ENTER if you’re done): ";
+        print "Enter a domain for the certificate (or ENTER if you’re done): ";
         my $d = <STDIN>;
         chomp $d;
         last if !defined $d || !length $d;

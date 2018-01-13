@@ -26,7 +26,7 @@ sub _authz_handler {
     my $uri_to_be_loaded = "http://$domain" . $http_challenge->path();
     my $key_authz = $acme->make_key_authorization($http_challenge);
 
-    print "$domain: Please make the contents of this path:$/\t$uri_to_be_loaded$/$/";
+    print "$/Please make the contents of this path:$/\t$uri_to_be_loaded$/$/";
     print "… serve up the following contents:$/$/\t$key_authz$/$/";
     print "Then press ENTER.$/";
     <>;
