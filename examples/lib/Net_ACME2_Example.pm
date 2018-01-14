@@ -92,7 +92,9 @@ sub run {
         $acme->poll_order($order);
     }
 
-    print "$/Certificate URL: " . $order->certificate() . $/ . $/;
+    print "$/Certificate key:$/$key$/$/";
+
+    print "$/Certificate URL: " . $order->certificate() . $/;
 
     print HTTP::Tiny->new()->get($order->certificate())->{'content'};
 
@@ -109,13 +111,22 @@ sub _get_domains {
         print "Enter a domain for the certificate (or ENTER if you’re done): ";
         my $d = <STDIN>;
         chomp $d;
-        last if !defined $d || !length $d;
 
-        if ($d =~ tr<*><> && !$self->CAN_WILDCARD) {
-            warn "This authorization type can’t do wildcard!\n";
+        if (!defined $d || !length $d) {
+            if (@domains) {
+                warn "Give at least one domain.$/";
+            }
+            else {
+                last;
+            }
         }
         else {
-            push( @domains, $d );
+            if ($d =~ tr<*><> && !$self->CAN_WILDCARD) {
+                warn "This authorization type can’t do wildcard!\n";
+            }
+            else {
+                push( @domains, $d );
+            }
         }
     }
 

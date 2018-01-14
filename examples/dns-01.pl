@@ -36,7 +36,7 @@ sub _authz_handler {
     my $sha = Digest::SHA::sha256($key_authz);
     my $b64 = MIME::Base64::encode_base64url($sha);
 
-    print "$/Create a TXT record for:$/$/\t“_acme-challenge.$zone.”$/$/";
+    print "$/Create a TXT record for:$/$/\t_acme-challenge.$zone.$/$/";
     print "… with the following value:$/$/";
 
     print "\t$b64$/$/";

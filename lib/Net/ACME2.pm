@@ -7,7 +7,7 @@ use warnings;
 
 =head1 NAME
 
-Net::ACME2 - IETF-standard ACME client protocol in Perl
+Net::ACME2 - L<IETF|https://www.ietf.org>-standard ACME client protocol in Perl
 
 =head1 SYNOPSIS
 
@@ -74,20 +74,37 @@ L<Net::ACME2::LetsEncrypt>.
 
 =head1 DESCRIPTION
 
-This module implements client logic for the IETF-standard ACME
+This library implements client logic for the L<IETF|https://www.ietf.org>-standard ACME
 (Automated Certificate Management Environment) protocol. As of this
 writing, that protocol remains in development; the latest draft will
 be available from L<https://datatracker.ietf.org/doc/draft-ietf-acme-acme/>.
 
-This module derives from L<Net::ACME>, which implements the
+Net::ACME2 derives from L<Net::ACME>, which implements the
 (significantly different) earlier draft of that protocol as initially
 deployed by L<Let’s Encrypt|http://letsencrypt.org>.
+
+Net::ACME2 is pure Perl, and all of its dependencies are either pure Perl
+or core modules.
 
 =head1 STATUS
 
 This is a “first-stab”, alpha-grade implementation. This
 distribution, like the underlying protocol, is very much still
 subject to change.
+
+=head1 FEATURES
+
+=over
+
+=item * This is a pure-Perl solution, all of whose dependencies are either
+core modules or pure-Perl themselves. Net::ACME2 will run anywhere that Perl
+runs. :)
+
+=item * Support for both ECDSA and RSA encrytion.
+
+=item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
+
+=back
 
 =head1 ERROR HANDLING
 
@@ -524,10 +541,19 @@ sub _post_url {
 
 =item * Re-evaluate once there is a production server in place.
 
+=item * Add pre-authorization support if there is ever a production
+use for it.
+
 =item * Tighten up challenge failure response.
 
-=item * Add tests.
+=item * Add (more) tests.
 
 =back
+
+=head1 SEE ALSO
+
+L<Crypt::Perl> provides pure-Perl cryptography for this library. See the
+present library distribution’s F</examples> directory for sample usage
+to generate CSRs.
 
 =cut

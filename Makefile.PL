@@ -7,7 +7,7 @@ WriteMakefile(
     NAME         => 'Net::ACME2',
     VERSION_FROM => 'lib/Net/ACME2/Constants.pm',            # finds \$VERSION
     AUTHOR       => 'Felipe Gasper',
-    ABSTRACT     => 'Client logic for the ACME protocol',
+    ABSTRACT_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
     MIN_PERL_VERSION => '5.8.9',
     PREREQ_PM    => {
