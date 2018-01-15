@@ -1,4 +1,7 @@
-Revision history for Perl module Net::ACME
+Revision history for Perl module Net::ACME2
+
+0.03 15 Jan 2018
+- Verbiage tweak in POD, search visibility
 
 0.02 14 Jan 2018
 - Fix examples to show generated key.
