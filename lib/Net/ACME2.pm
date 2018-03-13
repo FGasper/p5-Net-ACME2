@@ -352,7 +352,8 @@ sub get_authorization {
 
 =head2 I<OBJ>->make_key_authorization( CHALLENGE )
 
-Accepts an instance of L<Net::ACME2::Challenge> and returns
+Accepts an instance of L<Net::ACME2::Challenge> (probably a subclass
+thereof) and returns
 a key authorization string suitable for handling the given CHALLENGE.
 See F</examples> in the distribution for example usage.
 
