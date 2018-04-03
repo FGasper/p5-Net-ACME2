@@ -90,8 +90,9 @@ or core modules.
 
 =head1 STATUS
 
-This is a “first-stab”, alpha-grade implementation. This
-distribution, like the underlying protocol, is very much still
+This is an alpha-grade implementation. While the underlying protocol
+is L<in use for production|https://community.letsencrypt.org/t/acme-v2-production-environment-wildcards/55578>,
+it’s still not finalized; consequently, this distribution remains
 subject to change.
 
 =head1 FEATURES
@@ -546,8 +547,6 @@ sub _post_url {
 
 =over
 
-=item * Re-evaluate once there is a production server in place.
-
 =item * Add pre-authorization support if there is ever a production
 use for it.
 
@@ -561,6 +560,6 @@ use for it.
 
 L<Crypt::Perl> provides pure-Perl cryptography for this library. See the
 present library distribution’s F</examples> directory for sample usage
-to generate CSRs.
+to generate keys and CSRs.
 
 =cut

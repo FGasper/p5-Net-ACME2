@@ -1,5 +1,12 @@
 Revision history for Perl module Net::ACME2
 
+0.10 2 Apr 2018
+- Add “Content-Type” header to outgoing POSTs.
+
+0.09 14 Mar 2018
+- Fix MANIFEST (sorry!)
+- Update documentation a bit for the production endpoint.
+
 0.08 13 Mar 2018
 - Make the Let’s Encrypt module default to the production server.
 - DNS challenges are now instantiated as dns_01.pm instances.
