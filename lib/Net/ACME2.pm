@@ -138,6 +138,8 @@ use constant newAccount_booleans => qw(
     onlyReturnExisting
 );
 
+# the list of methods that need a “jwk” in their JWS Protected Header
+# (cf. section 6.2 of the spec)
 use constant FULL_JWT_METHODS => qw(
     newAccount
     revokeCert
@@ -153,7 +155,7 @@ interactions with the ACME server. %OPTS is:
 =over
 
 =item * C<key> - Required. The private key to associate with the ACME2
-user. PEM or DER format.
+user. Anything that C<Crypt::Perl::PK::parse_key()> can parse is acceptable.
 
 =item * C<key_id> - Optional. As returned by C<key_id()>.
 Saves a round-trip to the ACME2 server, so you should give this
@@ -171,7 +173,7 @@ emptor.
 sub new {
     my ( $class, %opts ) = @_;
 
-    die 'Need “key”!' if !$opts{'key'};
+    _die_generic('Need “key”!') if !$opts{'key'};
 
     my $self = {
         _host => $class->HOST(),
@@ -221,8 +223,11 @@ sub get_terms_of_service {
     }
 
     my $dir = $self->_get_directory();
-    my $url = $self->_get_directory()->{'meta'} or die 'No “meta” in directory!';
-    $url = $url->{'termsOfService'} or die 'No “terms-of-service” in directory metadata!';
+
+    # Exceptions here indicate an ACME violation and should be
+    # practically nonexistent.
+    my $url = $self->_get_directory()->{'meta'} or _die_generic('No “meta” in directory!');
+    $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
 
     return $url;
 }
@@ -367,7 +372,7 @@ handle HTTP challenges.
 sub make_key_authorization {
     my ($self, $challenge_obj) = @_;
 
-    die 'Need a challenge object!' if !$challenge_obj;
+    _die_generic('Need a challenge object!') if !$challenge_obj;
 
     return $challenge_obj->token() . '.' . $self->_key_thumbprint();
 }
@@ -464,7 +469,11 @@ sub _get_directory {
         $self->{'_ua'}->get("https://$self->{'_host'}$dir_path")->content_struct();
     };
 
-    $self->{'_ua'}->set_new_nonce_url( $self->{'_directory'}{'newNonce'} );
+    my $new_nonce_url = $self->{'_directory'}{'newNonce'} or do {
+        _die_generic('Directory is missing “newNonce”.');
+    };
+
+    $self->{'_ua'}->set_new_nonce_url( $new_nonce_url );
 
     return $self->{'_directory'};
 }
@@ -473,7 +482,7 @@ sub _require_key_id {
     my ($self, $opts_hr) = @_;
 
     $opts_hr->{'_key_id'} = $self->{'_key_id'} or do {
-        die 'No key ID has been set. Either pass “key_id” to new(), or create_new_account().';
+        _die_generic('No key ID has been set. Either pass “key_id” to new(), or create_new_account().');
     };
 
     return
@@ -488,13 +497,7 @@ sub _poll_order_or_authz {
 
     $order_or_authz_obj->update($content);
 
-    my $status = $order_or_authz_obj->status();
-
-    return 1 if $status eq 'valid';
-    return 0 if $status eq 'pending' || $status eq 'processing';
-
-    use Data::Dumper;
-    die Dumper $order_or_authz_obj; #TODO
+    return;
 }
 
 sub _key_obj {
@@ -523,7 +526,9 @@ sub _post {
     my $post_method;
     $post_method = 'post_full_jwt' if grep { $link_name eq $_ } FULL_JWT_METHODS();
 
-    my $url = $self->_get_directory()->{$link_name} or die "Unknown link name: “$link_name”";
+    # Since the $link_name will come from elsewhere in this module
+    # there really shouldn’t be an error here, but just in case.
+    my $url = $self->_get_directory()->{$link_name} or _die_generic("Unknown link name: “$link_name”");
 
     return $self->_post_url( $url, $data, $post_method );
 }
@@ -538,6 +543,10 @@ sub _post_url {
     my $post_method = $opt_post_method || 'post_key_id';
 
     return $self->{'_ua'}->$post_method( $url, $data );
+}
+
+sub _die_generic {
+    die Net::ACME2::X->create('Generic', @_);
 }
 
 1;

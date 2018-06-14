@@ -1,4 +1,4 @@
-package Net::ACME2::X::Base;
+package Net::ACME2::X::Generic;
 
 use strict;
 use warnings;

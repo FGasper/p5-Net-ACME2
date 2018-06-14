@@ -11,6 +11,9 @@ use Crypt::Perl::PKCS10 ();
 
 use HTTP::Tiny ();
 
+# Used to report failed challenges.
+use Data::Dumper;
+
 use Net::ACME2::LetsEncrypt ();
 
 use constant {
@@ -68,19 +71,37 @@ sub run {
         $acme->accept_challenge($challenge);
     }
 
-    while ($valid_authz_count != @authzs) {
-        my $waiting;
+    while (1) {
         for my $authz (@authzs) {
             next if $authz->status() eq 'valid';
-            if ($acme->poll_authorization($authz)) {
-                $valid_authz_count++;
+
+            $acme->poll_authorization($authz);
+
+            my $name = $authz->identifier()->{'value'};
+            my $status = $authz->status();
+
+            if ($status eq 'valid') {
+                substr($name, 0, 0, '*.') if $authz->wildcard();
+
+                print "$/“$name” has passed validation.$/";
+            }
+            elsif ($status eq 'pending') {
+                print "$/“$name”’s authorization is still pending …$/";
             }
             else {
-                $waiting = 1;
+                if ($status eq 'invalid') {
+                    my $challenge = $class->_get_challenge_from_authz($authz);
+                    print Dumper($challenge);
+                }
+
+                die "$/“$name”’s authorization is in “$status” state.";
             }
         }
 
-        sleep 1 if $waiting;
+        $valid_authz_count = grep { $_->status() eq 'valid' } @authzs;
+        last if $valid_authz_count == @authzs;
+
+        sleep 1;
     }
 
     my ($key, $csr) = _make_key_and_csr_for_domains(@domains);
@@ -99,6 +120,20 @@ sub run {
     print HTTP::Tiny->new()->get($order->certificate())->{'content'};
 
     return;
+}
+
+sub _get_challenge_from_authz {
+    my ($class, $authz_obj) = @_;
+
+    my $challenge_type = $class->_CHALLENGE_TYPE();
+
+    my ($challenge) = grep { $_->type() eq $challenge_type } $authz_obj->challenges();
+
+    if (!$challenge) {
+        die "No “$challenge_type” challenge for “$authz_obj”!\n";
+    }
+
+    return $challenge;
 }
 
 sub _get_domains {
