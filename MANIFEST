@@ -27,8 +27,8 @@ lib/Net/ACME2/LetsEncrypt.pm
 lib/Net/ACME2/Order.pm
 lib/Net/ACME2/X.pm
 lib/Net/ACME2/X/ACME.pm
-lib/Net/ACME2/X/Base.pm
 lib/Net/ACME2/X/Empty.pm
+lib/Net/ACME2/X/Generic.pm
 lib/Net/ACME2/X/HTTP/Network.pm
 lib/Net/ACME2/X/HTTP/Protocol.pm
 lib/Net/ACME2/X/InvalidCharacters.pm

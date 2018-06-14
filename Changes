@@ -1,5 +1,14 @@
 Revision history for Perl module Net::ACME2
 
+0.2
+- BREAKING: poll_authorization() and poll_order() now return empty rather than
+boolean and no longer throw an exception on an unrecognized status.
+- “http_01” challenges now have get_path() and get_content() methods.
+- “dns_01” challenges now have get_record_name() and get_record_value() methods.
+- Most exceptions are now converted to Net::ACME::X::Generic or subclasses
+thereof. The remaining plain-string exceptions “really should not happen”.
+- Some unused logic (e.g., compact JWS serialization) is pruned away.
+
 0.12 11 Jun 2018
 - Remove Types::Serialiser (thanks, Chris Novakovic!)
 
