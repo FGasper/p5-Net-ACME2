@@ -7,6 +7,6 @@ package Net::ACME2::Constants;
 use strict;
 use warnings;
 
-our $VERSION = '0.12';
+our $VERSION = '0.2-TRIAL1';
 
 1;
