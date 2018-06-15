@@ -67,6 +67,9 @@ sub new {
     return $self;
 }
 
+#mocked in tests
+*_base_request = __PACKAGE__->can('request');
+
 sub request {
     my ( $self, $method, $url, $args_hr ) = @_;
 
@@ -77,7 +80,7 @@ sub request {
     #cf. eval_bug.readme
     my $eval_err = $@;
 
-    my $resp = $self->SUPER::request( $method, $url, $args_hr || () );
+    my $resp = _base_request( $self, $method, $url, $args_hr || () );
 
     $@ = $eval_err;
 

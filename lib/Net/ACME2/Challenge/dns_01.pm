@@ -20,7 +20,7 @@ subclass of L<Net::ACME2::Challenge>.
 
 =head2 I<OBJ>->get_record_name()
 
-Returns the name (i.e., just the leftmost label) of the DNS record to create.
+Returns the name (i.e., just the leftmost label) of the TXT record to create.
 
 (NB: This is always the same name, as per the ACME specification.)
 
@@ -32,7 +32,7 @@ use constant get_record_name => '_acme-challenge';
 
 =head2 I<OBJ>->get_record_value( $ACME )
 
-Accepts a L<Net::ACME2> instance and returns the value of the DNS record
+Accepts a L<Net::ACME2> instance and returns the value of the TXT record
 to create.
 
 Example:

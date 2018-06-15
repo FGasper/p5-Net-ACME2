@@ -25,7 +25,6 @@ sub run {
     my ($class) = @_;
 
     my $_test_key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
-    print "Account key:$/$_test_key$/";
 
     my $acme = Net::ACME2::LetsEncrypt->new(
         key => $_test_key,
@@ -42,16 +41,12 @@ sub run {
         my $created = $acme->create_new_account(
             termsOfServiceAgreed => 1,
         );
-
-        printf "key ID: %s$/", $acme->key_id();
     }
 
     my @domains = $class->_get_domains();
 
     my $order = $acme->create_new_order(
         identifiers => [ map { { type => 'dns', value => $_ } } @domains ],
-        #notAfter => (time + 86400),
-        #notAfter => 'hahahahah',   #it accepts this?!?
     );
 
     my @authzs = map { $acme->get_authorization($_) } $order->authorizations();
@@ -75,13 +70,12 @@ sub run {
         for my $authz (@authzs) {
             next if $authz->status() eq 'valid';
 
-            $acme->poll_authorization($authz);
+            my $status = $acme->poll_authorization($authz);
 
             my $name = $authz->identifier()->{'value'};
-            my $status = $authz->status();
+            substr($name, 0, 0, '*.') if $authz->wildcard();
 
             if ($status eq 'valid') {
-                substr($name, 0, 0, '*.') if $authz->wildcard();
 
                 print "$/“$name” has passed validation.$/";
             }
@@ -105,6 +99,8 @@ sub run {
     }
 
     my ($key, $csr) = _make_key_and_csr_for_domains(@domains);
+
+    print "Finalizing order …$/";
 
     $acme->finalize_order($order, $csr);
 

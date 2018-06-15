@@ -54,7 +54,7 @@ X<Lets Encrypt> X<Let's Encrypt> X<letsencrypt>
 
     $acme->accept_challenge($challenge);
 
-    sleep 1 while !$acme->poll_authorization($authz);
+    sleep 1 while 'valid' ne $acme->poll_authorization($authz);
 
     # ... Make a key and CSR for *.example.com
 
@@ -133,6 +133,7 @@ use constant {
     _JWK_THUMBPRINT_DIGEST => 'sha256',
 };
 
+# accessed from test
 use constant newAccount_booleans => qw(
     termsOfServiceAgreed
     onlyReturnExisting
@@ -246,7 +247,10 @@ or 0 if the account already existed.
 sub create_new_account {
     my ($self, %opts) = @_;
 
-    $opts{$_} &&= JSON::true() for newAccount_booleans();
+    for my $name (newAccount_booleans()) {
+        next if !exists $opts{$name};
+        ($opts{$name} &&= JSON::true()) ||= JSON::false();
+    }
 
     my $resp = $self->_post(
         'newAccount',
@@ -264,7 +268,10 @@ sub create_new_account {
     my $struct = $resp->content_struct();
 
     if ($struct) {
-        $struct->{$_} = !!$struct->{$_} for newAccount_booleans();
+        for my $name (newAccount_booleans()) {
+            next if !exists $struct->{$name};
+            $struct->{$name} = $struct->{$name} ? 1 : 0;
+        }
     }
 
     return 1;
@@ -311,7 +318,7 @@ sub create_new_order {
 Fetches the authorization’s information based on the given URL
 and returns a L<Net::ACME2::Authorization> object.
 
-The URL is as given by L<Net::ACME2::Order>.
+The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 
 =cut
 
@@ -396,24 +403,27 @@ sub accept_challenge {
     return;
 }
 
-=head2 I<OBJ>->poll_authorization( AUTHORIZATION )
+=head2 $status = I<OBJ>->poll_authorization( AUTHORIZATION )
 
 Accepts a L<Net::ACME2::Authorization> instance and polls the
 ACME server for that authorization’s status. The AUTHORIZATION
 object is then updated with the results of the poll.
+
+As a courtesy, this returns the object’s new C<status()>.
 
 =cut
 
 #This has to handle updates to the authz and challenge objects
 *poll_authorization = *_poll_order_or_authz;
 
-=head2 I<OBJ>->finalize_order( ORDER, CSR )
+=head2 $status = I<OBJ>->finalize_order( ORDER, CSR )
 
 Finalizes an order and updates the ORDER object with the returned
 status. The CSR may be in either DER or PEM format.
 
-ORDER may have C<status()> of C<valid> after this operation,
-or you may need to C<poll_order()>.
+As a courtesy, this returns the ORDER’s C<status()>. If this does
+not equal C<valid>, then you should probably C<poll_order()>
+until it does.
 
 =cut
 
@@ -441,7 +451,7 @@ sub finalize_order {
 
     $order_obj->update($content);
 
-    return;
+    return $order_obj->status();
 }
 
 =head2 I<OBJ>->poll_order( ORDER )
@@ -497,7 +507,7 @@ sub _poll_order_or_authz {
 
     $order_or_authz_obj->update($content);
 
-    return;
+    return $order_or_authz_obj->status();
 }
 
 sub _key_obj {
@@ -558,7 +568,7 @@ sub _die_generic {
 =item * Add pre-authorization support if there is ever a production
 use for it.
 
-=item * Tighten up challenge failure response.
+=item * Expose the Retry-After header via the module API.
 
 =item * Add (more) tests.
 

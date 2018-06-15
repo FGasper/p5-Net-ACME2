@@ -1,8 +1,10 @@
 Revision history for Perl module Net::ACME2
 
 0.2
-- BREAKING: poll_authorization() and poll_order() now return empty rather than
-boolean and no longer throw an exception on an unrecognized status.
+- BREAKING: poll_authorization() and poll_order() now return the object’s
+new status rather than boolean and no longer throw an exception on an
+unrecognized status.
+- finalize_order() now returns the object’s new status.
 - “http_01” challenges now have get_path() and get_content() methods.
 - “dns_01” challenges now have get_record_name() and get_record_value() methods.
 - Most exceptions are now converted to Net::ACME::X::Generic or subclasses

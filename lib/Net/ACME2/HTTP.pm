@@ -18,7 +18,6 @@ There should be no reason to interact with this class in production.
 use strict;
 use warnings;
 
-use Crypt::Perl::PK ();
 use JSON ();
 
 use Net::ACME2::Error          ();
@@ -137,7 +136,9 @@ sub _request {
 
     eval { $resp = $self->_ua_request( $type, @args ); };
 
-    if (ref $@) {
+    # Check ref() first to avoid potentially running overload.pm’s
+    # stringification.
+    if (ref($@) || $@) {
         my $exc = $@;
 
         if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
