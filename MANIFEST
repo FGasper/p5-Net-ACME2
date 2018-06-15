@@ -36,3 +36,6 @@ lib/Net/ACME2/X/InvalidParameter.pm
 lib/Net/ACME2/X/UnexpectedResponse.pm
 lib/Net/ACME2/X/UnrecognizedKey.pm
 t/Net-ACME2-Challenge-http_01-Handler.t
+t/Net-ACME2.t
+t/lib/Test/ACME2_Server.pm
+t/lib/Test/Crypt.pm
