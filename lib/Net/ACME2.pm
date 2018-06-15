@@ -227,7 +227,7 @@ sub get_terms_of_service {
 
     # Exceptions here indicate an ACME violation and should be
     # practically nonexistent.
-    my $url = $self->_get_directory()->{'meta'} or _die_generic('No “meta” in directory!');
+    my $url = $dir->{'meta'} or _die_generic('No “meta” in directory!');
     $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
 
     return $url;
