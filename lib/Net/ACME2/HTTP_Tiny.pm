@@ -46,7 +46,16 @@ use Net::ACME2::Constants ();
 use Net::ACME2::X         ();
 
 our $VERSION;
-*VERSION = \$Net::ACME2::Constants::VERSION;
+
+sub VERSION {
+
+    # HTTP::Tiny gets upset if there’s anything non-numeric
+    # (e.g., “-TRIAL1”) in VERSION(). So weed it out here.
+    my $version = $Net::ACME2::Constants::VERSION;
+    $version =~ s<[^0-9].].*><>;
+
+    return $version;
+}
 
 #Use this to tweak SSL config, e.g., if you want to cache PublicSuffix.
 our @SSL_OPTIONS;
