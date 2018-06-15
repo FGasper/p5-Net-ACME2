@@ -71,7 +71,12 @@ my $created = $acme->create_new_account(
 
 is( $created, 1, 'create_new_account() on new account creation' );
 
+my $key_id = $acme->key_id();
+ok( $key_id, 'key_id() gets updated' );
+
 $created = $acme->create_new_account();
 is( $created, 0, 'create_new_account() if account already exists' );
+
+is( $acme->key_id(), $key_id, 'key_id() stays the same' );
 
 done_testing();
