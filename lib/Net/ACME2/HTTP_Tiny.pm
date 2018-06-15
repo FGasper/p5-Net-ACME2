@@ -68,7 +68,7 @@ sub new {
 }
 
 #mocked in tests
-*_base_request = __PACKAGE__->can('request');
+*_base_request = HTTP::Tiny->can('request');
 
 sub request {
     my ( $self, $method, $url, $args_hr ) = @_;

@@ -117,6 +117,7 @@ Specific error classes aren’t yet defined.
 =cut
 
 use Crypt::Format ();
+use Crypt::Perl::PK ();
 use MIME::Base64 ();
 
 use Net::ACME2::Constants ();
