@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     NAME         => 'Net::ACME2',
-    VERSION_FROM => 'lib/Net/ACME2/Constants.pm',            # finds \$VERSION
+    VERSION_FROM => 'lib/Net/ACME2.pm',            # finds \$VERSION
     AUTHOR       => 'Felipe Gasper',
     ABSTRACT_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
