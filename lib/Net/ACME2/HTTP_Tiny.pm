@@ -42,8 +42,7 @@ use parent qw( HTTP::Tiny );
 
 use HTTP::Tiny::UA::Response ();
 
-use Net::ACME2::Constants ();
-use Net::ACME2::X         ();
+use Net::ACME2::X ();
 
 # This circular dependency is unfortunate, but PAUSE needs to see a static
 # $Net::ACME2::VERSION. (Thanks to Dan Book for pointing it out.)
