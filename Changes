@@ -13,6 +13,7 @@ thereof. The remaining plain-string exceptions “really should not happen”.
 - We no longer send undef/null values to newAccount.
 - Example scripts are a bit more refined.
 - More substantive tests are added.
+- Fix versioning issue with PAUSE. (Thanks to Dan Book for mentioning it.)
 
 0.12 11 Jun 2018
 - Remove Types::Serialiser (thanks, Chris Novakovic!)
