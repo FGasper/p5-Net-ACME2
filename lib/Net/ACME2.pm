@@ -120,13 +120,11 @@ use Crypt::Format ();
 use Crypt::Perl::PK ();
 use MIME::Base64 ();
 
-use Net::ACME2::Constants ();
 use Net::ACME2::HTTP ();
 use Net::ACME2::Order ();
 use Net::ACME2::Authorization ();
 
-our $VERSION;
-*VERSION = *Net::ACME2::Constants::VERSION;
+our $VERSION = '0.2-TRIAL3';
 
 use constant {
     JWS_FORMAT => undef,

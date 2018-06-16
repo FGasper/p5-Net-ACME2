@@ -45,13 +45,15 @@ use HTTP::Tiny::UA::Response ();
 use Net::ACME2::Constants ();
 use Net::ACME2::X         ();
 
-our $VERSION;
+# This circular dependency is unfortunate, but PAUSE needs to see a static
+# $Net::ACME2::VERSION. (Thanks to Dan Book for pointing it out.)
+use Net::ACME2 ();
 
 sub VERSION {
 
     # HTTP::Tiny gets upset if there’s anything non-numeric
     # (e.g., “-TRIAL1”) in VERSION(). So weed it out here.
-    my $version = $Net::ACME2::Constants::VERSION;
+    my $version = $Net::ACME2::VERSION;
     $version =~ s<[^0-9].].*><>;
 
     return $version;
