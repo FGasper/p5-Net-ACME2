@@ -9,6 +9,8 @@ examples/dns-01.pl
 examples/http-01.pl
 examples/lib/Net_ACME2_Example.pm
 examples/tls-alpn-01.pl
+examples/tls_alpn_01_client.pl
+examples/tls_alpn_01_server.pl
 lib/Net/ACME2.pm
 lib/Net/ACME2/AccessorBase.pm
 lib/Net/ACME2/Authorization.pm
@@ -37,6 +39,7 @@ lib/Net/ACME2/X/InvalidParameter.pm
 lib/Net/ACME2/X/UnexpectedResponse.pm
 lib/Net/ACME2/X/UnrecognizedKey.pm
 t/Net-ACME2-Challenge-http_01-Handler.t
+t/Net-ACME2-Challenge-tls_alpn_01.t
 t/Net-ACME2.t
 t/lib/Test/ACME2_Server.pm
 t/lib/Test/Crypt.pm

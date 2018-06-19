@@ -16,7 +16,7 @@ WriteMakefile(
         'parent'                   => 0.225,
         'Call::Context'            => 0.02,
         'Crypt::Format'            => 0.06,
-        'Crypt::Perl'              => '0.18',
+        'Crypt::Perl'              => 0.18,
         'HTTP::Tiny'               => 0.058,
         'HTTP::Tiny::UA::Response' => 0.004,
         'JSON'                     => 2.9,
