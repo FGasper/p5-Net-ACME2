@@ -308,14 +308,10 @@ sub create_new_order {
 
     $resp->die_because_unexpected() if $resp->status() != 201;
 
-    my $order = Net::ACME2::Order->new(
+    return Net::ACME2::Order->new(
         id => $resp->header('location'),
         %{ $resp->content_struct() },
     );
-use Data::Dumper;
-print STDERR Dumper $order;
-
-    return $order;
 }
 
 =head2 I<OBJ>->get_authorization( URL )
