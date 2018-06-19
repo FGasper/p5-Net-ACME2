@@ -105,6 +105,8 @@ runs. :)
 
 =item * Support for both ECDSA and RSA encrytion.
 
+=item * Support for http-01, dns-01, and tls-alpn-01 challenges.
+
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
 =back
@@ -269,7 +271,7 @@ sub create_new_account {
     if ($struct) {
         for my $name (newAccount_booleans()) {
             next if !exists $struct->{$name};
-            $struct->{$name} = $struct->{$name} ? 1 : 0;
+            ($struct->{$name} &&= 1) ||= 0;
         }
     }
 
@@ -306,10 +308,14 @@ sub create_new_order {
 
     $resp->die_because_unexpected() if $resp->status() != 201;
 
-    return Net::ACME2::Order->new(
+    my $order = Net::ACME2::Order->new(
         id => $resp->header('location'),
         %{ $resp->content_struct() },
     );
+use Data::Dumper;
+print STDERR Dumper $order;
+
+    return $order;
 }
 
 =head2 I<OBJ>->get_authorization( URL )
@@ -392,7 +398,7 @@ Signal to the ACME server that the CHALLENGE is ready.
 sub accept_challenge {
     my ($self, $challenge_obj) = @_;
 
-    my $post = $self->_post_url(
+    $self->_post_url(
         $challenge_obj->url(),
         {
             keyAuthorization => $self->make_key_authorization($challenge_obj),
