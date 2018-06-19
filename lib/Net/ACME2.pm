@@ -124,7 +124,7 @@ use Net::ACME2::HTTP ();
 use Net::ACME2::Order ();
 use Net::ACME2::Authorization ();
 
-our $VERSION = '0.2-TRIAL3';
+our $VERSION = '0.2';
 
 use constant {
     JWS_FORMAT => undef,

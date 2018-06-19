@@ -3,7 +3,7 @@ package Net::ACME2::Challenge::http_01;
 use strict;
 use warnings;
 
-use parent qw( Net::ACME2::ChallengeBase::HasToken );
+use parent qw( Net::ACME2::Challenge );
 
 use constant _PATH_DIRECTORY => '/.well-known/acme-challenge';
 

@@ -7,6 +7,7 @@ unrecognized status.
 - finalize_order() now returns the object’s new status.
 - “http_01” challenges now have get_path() and get_content() methods.
 - “dns_01” challenges now have get_record_name() and get_record_value() methods.
+- Experimental support for the “tls-alpn-01” ACME challenge.
 - Most exceptions are now converted to Net::ACME::X::Generic or subclasses
 thereof. The remaining plain-string exceptions “really should not happen”.
 - Some unused logic (e.g., compact JWS serialization) is pruned away.

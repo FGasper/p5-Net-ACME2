@@ -3,7 +3,7 @@ package Net::ACME2::Challenge::dns_01;
 use strict;
 use warnings;
 
-use parent qw( Net::ACME2::ChallengeBase::HasToken );
+use parent qw( Net::ACME2::Challenge );
 
 =encoding utf-8
 
