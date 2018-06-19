@@ -192,7 +192,7 @@ sub new {
     return $self;
 }
 
-=head2 I<OBJ>->key_id()
+=head2 $id = I<OBJ>->key_id()
 
 Returns the object’s cached key ID, either as given at instantiation
 or as fetched in C<create_new_account()>.
@@ -205,9 +205,8 @@ sub key_id {
     return $self->{'_key_id'};
 }
 
-=head2 I<CLASS_OR_OBJ>->get_terms_of_service()
+=head2 $url = I<OBJ>->get_terms_of_service()
 
-Callable as either an instance method or a class method.
 Returns the URL for the terms of service.
 
 B<NOTE:> For L<Let’s Encrypt|http://letsencrypt.org> you can
@@ -235,7 +234,7 @@ sub get_terms_of_service {
     return $url;
 }
 
-=head2 I<OBJ>->create_new_account( %OPTS )
+=head2 $created_yn = I<OBJ>->create_new_account( %OPTS )
 
 Creates a new account using the ACME2 object’s key and the passed
 %OPTS, which are as described in the ACME2 spec (cf. C<newAccount>).
@@ -292,7 +291,7 @@ sub create_new_account {
 #    return $set;
 #}
 
-=head2 I<OBJ>->create_new_order( %OPTS )
+=head2 $order = I<OBJ>->create_new_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
 ACME spec (cf. C<newOrder>). Boolean values may be given as simple
@@ -315,9 +314,9 @@ sub create_new_order {
     );
 }
 
-=head2 I<OBJ>->get_authorization( URL )
+=head2 $authz = I<OBJ>->get_authorization( $URL )
 
-Fetches the authorization’s information based on the given URL
+Fetches the authorization’s information based on the given $URL
 and returns a L<Net::ACME2::Authorization> object.
 
 The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
@@ -364,11 +363,11 @@ sub get_authorization {
 #    );
 #}
 
-=head2 I<OBJ>->make_key_authorization( CHALLENGE )
+=head2 $str = I<OBJ>->make_key_authorization( $CHALLENGE )
 
 Accepts an instance of L<Net::ACME2::Challenge> (probably a subclass
 thereof) and returns
-a key authorization string suitable for handling the given CHALLENGE.
+a key authorization string suitable for handling the given $CHALLENGE.
 See F</examples> in the distribution for example usage.
 
 If you’re using HTTP authorization and are on the same server as the
@@ -405,7 +404,7 @@ sub accept_challenge {
     return;
 }
 
-=head2 $status = I<OBJ>->poll_authorization( AUTHORIZATION )
+=head2 $status = I<OBJ>->poll_authorization( $AUTHORIZATION )
 
 Accepts a L<Net::ACME2::Authorization> instance and polls the
 ACME server for that authorization’s status. The AUTHORIZATION
@@ -418,12 +417,12 @@ As a courtesy, this returns the object’s new C<status()>.
 #This has to handle updates to the authz and challenge objects
 *poll_authorization = *_poll_order_or_authz;
 
-=head2 $status = I<OBJ>->finalize_order( ORDER, CSR )
+=head2 $status = I<OBJ>->finalize_order( $ORDER, $CSR )
 
-Finalizes an order and updates the ORDER object with the returned
-status. The CSR may be in either DER or PEM format.
+Finalizes an order and updates the $ORDER object with the returned
+status. $CSR may be in either DER or PEM format.
 
-As a courtesy, this returns the ORDER’s C<status()>. If this does
+As a courtesy, this returns the $ORDER’s C<status()>. If this does
 not equal C<valid>, then you should probably C<poll_order()>
 until it does.
 
@@ -456,7 +455,7 @@ sub finalize_order {
     return $order_obj->status();
 }
 
-=head2 I<OBJ>->poll_order( ORDER )
+=head2 $status = I<OBJ>->poll_order( $ORDER )
 
 Like C<poll_authorization()> but handles a
 L<Net::ACME2::Order> object instead.
