@@ -15,6 +15,7 @@ thereof. The remaining plain-string exceptions “really should not happen”.
 - Example scripts are a bit more refined.
 - More substantive tests are added.
 - Fix versioning issue with PAUSE. (Thanks to Dan Book for mentioning it.)
+- I now consider this to be a “beta” release.
 
 0.12 11 Jun 2018
 - Remove Types::Serialiser (thanks, Chris Novakovic!)

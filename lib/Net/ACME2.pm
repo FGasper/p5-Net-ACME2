@@ -90,10 +90,11 @@ or core modules.
 
 =head1 STATUS
 
-This is an alpha-grade implementation. While the underlying protocol
+This is a beta-grade implementation. While the underlying protocol
 is L<in use for production|https://community.letsencrypt.org/t/acme-v2-production-environment-wildcards/55578>,
 it’s still not finalized; consequently, this distribution remains
-subject to change.
+subject to change. It is expected that any further breaking changes
+will be small, but you still B<MUST> check the changelog before upgrading!
 
 =head1 FEATURES
 
@@ -126,7 +127,7 @@ use Net::ACME2::HTTP ();
 use Net::ACME2::Order ();
 use Net::ACME2::Authorization ();
 
-our $VERSION = '0.2-TRIAL4';
+our $VERSION = '0.2';
 
 use constant {
     JWS_FORMAT => undef,
