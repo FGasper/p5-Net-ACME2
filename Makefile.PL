@@ -22,6 +22,11 @@ WriteMakefile(
         'JSON'                     => 2.9,
         'MIME::Base64'             => 3.11,
         'X::Tiny'                  => 0.12,
+
+        # We need SSL to speak ACME. There is no pure Perl
+        # SSL implementation, so the following will bring in
+        # Net::SSLeay, which requires XS. :-(
+        'IO::Socket::SSL'          => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },

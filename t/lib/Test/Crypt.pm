@@ -33,7 +33,7 @@ sub decode_acme2_jwt {
     my $signed = "$token_hr->{'protected'}.$token_hr->{'payload'}";
     my $signature = MIME::Base64::decode_base64url($token_hr->{'signature'});
 
-    verify_rs256( $key_text, $signed, $signature );
+    verify( $key_text, $signed, $signature );
 
     my ($header, $payload) = @{$token_hr}{'protected', 'payload'};
 
@@ -53,17 +53,23 @@ sub decode_acme2_jwt_extract_key {
 
     my $key_obj = Crypt::Perl::PK::parse_jwk( $header_hr->{'jwk'} );
 
-    return ($key_obj, decode_acme2_jwt($token, $key_obj->to_pem()));
+    my $is_ecc = $key_obj->isa('Crypt::Perl::ECDSA::PublicKey');
+    my $to_pem_method = $is_ecc ? 'to_pem_with_curve_name' : 'to_pem';
+
+    return ($key_obj, decode_acme2_jwt($token, $key_obj->$to_pem_method()));
 }
 
-sub verify_rs256 {
+sub verify {
     my ($key, $message, $signature) = @_;
 
     confess "No key!" if !$key;
 
     my $kobj = Crypt::Perl::PK::parse_key($key);
 
-    die "JWT verification failed!" if !$kobj->verify_RS256($message, $signature);
+    my $is_ecc = $kobj->isa('Crypt::Perl::ECDSA::PublicKey');
+    my $verify_method = $is_ecc ? 'verify_jwa' : 'verify_RS256';
+
+    die "JWT verification failed!" if !$kobj->$verify_method($message, $signature);
 
     return;
 }

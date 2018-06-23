@@ -85,9 +85,6 @@ Net::ACME2 derives from L<Net::ACME>, which implements the
 (significantly different) earlier draft of that protocol as initially
 deployed by L<Let’s Encrypt|http://letsencrypt.org>.
 
-Net::ACME2 is pure Perl, and all of its dependencies are either pure Perl
-or core modules.
-
 =head1 STATUS
 
 This is a beta-grade implementation. While the underlying protocol
@@ -100,15 +97,18 @@ will be small, but you still B<MUST> check the changelog before upgrading!
 
 =over
 
-=item * This is a pure-Perl solution, all of whose dependencies are either
-core modules or pure-Perl themselves. Net::ACME2 will run anywhere that Perl
-runs. :)
-
 =item * Support for both ECDSA and RSA encrytion.
 
 =item * Support for http-01, dns-01, and tls-alpn-01 challenges.
 
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
+
+=item * This is a pure-Perl solution. Most of its dependencies are
+either core modules or pure Perl themselves. XS is needed to be able
+to communicate with the ACME server via TLS; however, most Perl installations
+already include the necessary logic for TLS.
+
+In short, Net::ACME2 will run (almost) anywhere that Perl runs. :)
 
 =back
 
@@ -119,19 +119,17 @@ Specific error classes aren’t yet defined.
 
 =cut
 
-use Crypt::Format ();
-use Crypt::Perl::PK ();
+use Crypt::Format;
+use Crypt::Perl::PK;
 use MIME::Base64 ();
 
-use Net::ACME2::HTTP ();
-use Net::ACME2::Order ();
-use Net::ACME2::Authorization ();
+use Net::ACME2::HTTP;
+use Net::ACME2::Order;
+use Net::ACME2::Authorization;
 
 our $VERSION = '0.2';
 
 use constant {
-    JWS_FORMAT => undef,
-
     _JWK_THUMBPRINT_DIGEST => 'sha256',
 };
 
@@ -523,7 +521,6 @@ sub _set_ua {
     $self->{'_ua'} = Net::ACME2::HTTP->new(
         key => $self->_key_obj(),
         key_id => $self->{'_key_id'},
-        jws_format => $self->JWS_FORMAT(),
     );
 
     return;

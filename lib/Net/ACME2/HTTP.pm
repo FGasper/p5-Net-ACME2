@@ -45,7 +45,6 @@ sub new {
         _ua       => $ua,
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
-        _jws_format => $opts{'jws_format'},
     }, $class;
 
     return bless $self, $class;
@@ -240,7 +239,6 @@ sub _create_jwt {
 
         $class->new(
             key => $self->{'_acme_key'},
-            format => $self->{'_jws_format'},
         );
     };
 

@@ -1,6 +1,10 @@
 Revision history for Perl module Net::ACME2
 
-0.2
+0.21
+- Acknowledge need for XS-based SSL functionality. This module can’t run
+  “anywhere that Perl runs” because of this. :-(
+
+0.2 19 Jun 2018
 - BREAKING: poll_authorization() and poll_order() now return the object’s
 new status rather than boolean and no longer throw an exception on an
 unrecognized status.
