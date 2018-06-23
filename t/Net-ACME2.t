@@ -71,7 +71,6 @@ my @alg_key = (
     [ p256 => $_P256_KEY ],
     [ p384 => $_P384_KEY ],
 );
-use Carp::Always;
 
 for my $t (@alg_key) {
     my ($alg, $key_pem) = @$t;
