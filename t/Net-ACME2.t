@@ -3,13 +3,18 @@
 use strict;
 use warnings;
 
+use Try::Tiny;
+
 use Test::More;
+use Test::Exception;
 use Test::FailWarnings;
 
 use Digest::MD5;
 use HTTP::Status;
 use URI;
 use JSON;
+
+use Crypt::Format ();
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -28,7 +33,7 @@ use Test::ACME2_Server;
     };
 }
 
-my $_ACME_KEY  = <<END;
+my $_RSA_KEY  = <<END;
 -----BEGIN RSA PRIVATE KEY-----
 MIICWwIBAAKBgQCkOYWppsEFfKHqIntkpUjmuwnBH3sRYP00YRdIhrz6ypRpxX6H
 c2Q0IrSprutu9/dUy0j9a96q3kRa9Qxsa7paQj7xtlTWx9qMHvhlrG3eLMIjXT0J
@@ -46,37 +51,83 @@ vcVkUrsg027gA5jRttaXMk8x9shFuHB9V5/pkBFwag==
 -----END RSA PRIVATE KEY-----
 END
 
-my $SERVER_OBJ = Test::ACME2_Server->new(
-    ca_class => 'MyCA',
+my $_P256_KEY = <<END;
+-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIKDv8TBijBVbTYB7lfUnwLn4qjqWD0GD7XOXzdp0wb61oAoGCCqGSM49
+AwEHoUQDQgAEBJIULcFadtIBc0TuNzT80UFcfkQ0U7+EPqEJNXamG1H4/z8xVgE7
+3hoBfX4xbN2Hx2p26eNIptt+1jj2H/M44g==
+-----END EC PRIVATE KEY-----
+END
+
+my $_P384_KEY = <<END;
+-----BEGIN EC PRIVATE KEY-----
+MIGkAgEBBDBqmQFgqovKRpzWs0JST9p/vtRQCHQi3r+6N2zoOorRv/JQoGMHZB+i
+c4d7oLnMpx+gBwYFK4EEACKhZANiAATXy7Zwmz5s98iSrQ+Y6lZ56g8/1INa4GY2
+LeDDedG+NvKKcj0P3uJV994RSyitrijBQvN2ccSuL67IHUQ3I4O7S7eKRNsU8R7K
+3ljffUl1vtb6GnjPgSZgt2zugJCwlH8=
+-----END EC PRIVATE KEY-----
+END
+
+my @alg_key = (
+    [ rsa => $_RSA_KEY ],
+    [ p256 => $_P256_KEY ],
+    [ p384 => $_P384_KEY ],
 );
+use Carp::Always;
 
-#----------------------------------------------------------------------
-# new()
+for my $t (@alg_key) {
+    my ($alg, $key_pem) = @$t;
 
-my $acme = MyCA->new( key => $_ACME_KEY );
-isa_ok( $acme, 'MyCA', 'new() response' );
+    my $key_der = Crypt::Format::pem2der($key_pem);
 
-#----------------------------------------------------------------------
-# get_terms_of_service()
+    my @formats = (
+        [ pem => $key_pem ],
+        [ der => $key_der ],
+    );
 
-my $tos = $acme->get_terms_of_service();
+    for my $tt (@formats) {
+        my ($format, $key_str) = @$tt;
 
-is( $tos, $SERVER_OBJ->TOS_URL(), 'get_terms_of_service' );
+        diag "$alg, $format";
 
-#----------------------------------------------------------------------
+        lives_ok(
+            sub {
+                my $SERVER_OBJ = Test::ACME2_Server->new(
+                    ca_class => 'MyCA',
+                );
 
-my $created = $acme->create_new_account(
-    termsOfServiceAgreed => 1,
-);
+                #----------------------------------------------------------------------
+                # new()
 
-is( $created, 1, 'create_new_account() on new account creation' );
+                my $acme = MyCA->new( key => $key_str );
+                isa_ok( $acme, 'MyCA', 'new() response' );
 
-my $key_id = $acme->key_id();
-ok( $key_id, 'key_id() gets updated' );
+                #----------------------------------------------------------------------
+                # get_terms_of_service()
 
-$created = $acme->create_new_account();
-is( $created, 0, 'create_new_account() if account already exists' );
+                my $tos = $acme->get_terms_of_service();
 
-is( $acme->key_id(), $key_id, 'key_id() stays the same' );
+                is( $tos, $SERVER_OBJ->TOS_URL(), 'get_terms_of_service' );
+
+                #----------------------------------------------------------------------
+
+                my $created = $acme->create_new_account(
+                    termsOfServiceAgreed => 1,
+                );
+
+                is( $created, 1, 'create_new_account() on new account creation' );
+
+                my $key_id = $acme->key_id();
+                ok( $key_id, 'key_id() gets updated' );
+
+                $created = $acme->create_new_account();
+                is( $created, 0, 'create_new_account() if account already exists' );
+
+                is( $acme->key_id(), $key_id, 'key_id() stays the same' );
+            },
+            "no errors: $alg, $format",
+        );
+    }
+}
 
 done_testing();

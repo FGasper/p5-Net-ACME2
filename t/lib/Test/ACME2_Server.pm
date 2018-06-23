@@ -53,12 +53,17 @@ sub new {
 
             my ($key_obj, $header, $payload) = Test::Crypt::decode_acme2_jwt_extract_key($args_hr->{'content'});
 
+            my $is_ecc = $key_obj->isa('Crypt::Perl::ECDSA::PublicKey');
+            my $pem_method = $is_ecc ? 'to_pem_with_curve_name' : 'to_pem';
+
+            my $key_pem = $key_obj->$pem_method();
+
             my $status;
-            if ($self->{'_registered_keys'}{ $key_obj->to_pem() }) {
+            if ($self->{'_registered_keys'}{$key_pem}) {
                 $status = 'OK';
             }
             else {
-                $self->{'_registered_keys'}{ $key_obj->to_pem() } = 1;
+                $self->{'_registered_keys'}{$key_pem} = 1;
                 $status = 'CREATED';
             }
 
@@ -81,7 +86,7 @@ sub new {
                 headers => {
                     $self->_new_nonce_header(),
                     _CONTENT_TYPE_JSON(),
-                    location => "https://$host/key/" . Digest::MD5::md5_hex($key_obj->to_pem()),
+                    location => "https://$host/key/" . Digest::MD5::md5_hex($key_pem),
                 },
                 content => \%response,
             };

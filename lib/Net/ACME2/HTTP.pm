@@ -219,10 +219,12 @@ sub _create_jwt {
     $self->{'_jwt_maker'} ||= do {
         my $class;
 
-        if ($self->{'_acme_key'}->isa('Crypt::Perl::RSA::PrivateKey')) {
+        my $key_type = $self->{'_acme_key'}->get_type();
+
+        if ($key_type eq 'rsa') {
             $class = 'Net::ACME2::JWTMaker::RSA';
         }
-        elsif ($self->{'_acme_key'}->isa('Crypt::Perl::ECDSA::PrivateKey')) {
+        elsif ($key_type eq 'ecdsa') {
             $class = 'Net::ACME2::JWTMaker::ECC';
         }
         else {
@@ -230,7 +232,7 @@ sub _create_jwt {
             # As of this writing, Crypt::Perl only does RSA and ECDSA keys.
             # If we get here, it’s possible that Crypt::Perl now supports
             # an additional key type that this library doesn’t recognize.
-            die Net::ACME2::X->create('Generic', "Unrecognized key type: $self->{'_acme_key'}");
+            die Net::ACME2::X->create('Generic', "Unrecognized key type: $key_type");
         }
 
         if (!$class->can('new')) {
@@ -240,7 +242,6 @@ sub _create_jwt {
 
         $class->new(
             key => $self->{'_acme_key'},
-            format => $self->{'_jws_format'},
         );
     };
 
