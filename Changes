@@ -3,6 +3,7 @@ Revision history for Perl module Net::ACME2
 0.21
 - Acknowledge need for XS-based SSL functionality. This module can’t run
   “anywhere that Perl runs” because of this. :-(
+- Make tests flex ECDSA keys as well as RSA.
 
 0.2 19 Jun 2018
 - BREAKING: poll_authorization() and poll_order() now return the object’s

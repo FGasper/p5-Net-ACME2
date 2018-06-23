@@ -106,9 +106,10 @@ will be small, but you still B<MUST> check the changelog before upgrading!
 =item * This is a pure-Perl solution. Most of its dependencies are
 either core modules or pure Perl themselves. XS is needed to be able
 to communicate with the ACME server via TLS; however, most Perl installations
-already include the necessary logic for TLS.
+already include the necessary logic (i.e., L<Net::SSLeay>) for TLS.
 
-In short, Net::ACME2 will run (almost) anywhere that Perl runs. :)
+In short, Net::ACME2 will run anywhere that Perl has SSL, which is
+I<almost> everywhere that Perl runs.
 
 =back
 
