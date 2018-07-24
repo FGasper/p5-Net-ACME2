@@ -69,7 +69,7 @@ X<Lets Encrypt> X<Let's Encrypt> X<letsencrypt>
 
     # ... Download your certificate! :)
 
-See F</examples> in the distribution for a more fleshed-out example.
+See F</examples> in the distribution for more fleshed-out examples.
 
 To use L<Let’s Encrypt|http://letsencrypt.org>, see
 L<Net::ACME2::LetsEncrypt>.
@@ -104,11 +104,11 @@ will be small, but you still B<MUST> check the changelog before upgrading!
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
 =item * This is a pure-Perl solution. Most of its dependencies are
-either core modules or pure Perl themselves. XS is needed to be able
-to communicate with the ACME server via TLS; however, most Perl installations
+either core modules or pure Perl themselves. XS is necessary to
+communicate with the ACME server via TLS; however, most Perl installations
 already include the necessary logic (i.e., L<Net::SSLeay>) for TLS.
 
-In short, Net::ACME2 will run anywhere that Perl has SSL, which is
+In short, Net::ACME2 will run anywhere that Perl can speak TLS, which is
 I<almost> everywhere that Perl runs.
 
 =back
@@ -117,6 +117,11 @@ I<almost> everywhere that Perl runs.
 
 All thrown exceptions are instances of L<Net::ACME2::X::Base>.
 Specific error classes aren’t yet defined.
+
+=head1 SPEED
+
+If you notice speed problems, check to see if your L<Math::BigInt>
+installation can be made faster.
 
 =cut
 
