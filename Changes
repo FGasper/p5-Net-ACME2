@@ -1,6 +1,7 @@
 Revision history for Perl module Net::ACME2
 
 0.21
+- Make LetsEncrypt.pm default to the production server.
 - Acknowledge need for XS-based TLS functionality. This module can’t run
   “anywhere that Perl runs” because of this. :-(
 - Make tests flex ECDSA keys as strenuously as they flex RSA keys.
