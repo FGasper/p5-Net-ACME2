@@ -27,6 +27,7 @@ sub run {
     my $_test_key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
 
     my $acme = Net::ACME2::LetsEncrypt->new(
+        environment => 'staging',
         key => $_test_key,
     );
 

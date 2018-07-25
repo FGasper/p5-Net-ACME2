@@ -18,9 +18,16 @@ X<Lets Encrypt> X<Let's Encrypt> X<letsencrypt>
     use parent qw( Net::ACME2 );
 
     use constant {
-        HOST => 'acme.someca.net',
         DIRECTORY_PATH => '/acme-directory',
     };
+
+    # %opts are the parameters given to new().
+    sub HOST {
+        my ($class, %opts) = @_;
+
+        # You can make this depend on the %opts if you want.
+        return 'acme.someca.net';
+    }
 
     package main;
 
@@ -183,7 +190,7 @@ sub new {
     _die_generic('Need “key”!') if !$opts{'key'};
 
     my $self = {
-        _host => $class->HOST(),
+        _host => $class->HOST(%opts),
         _key  => $opts{'key'},
         _key_id => $opts{'key_id'},
         _directory => $opts{'directory'},
