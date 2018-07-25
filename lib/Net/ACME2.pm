@@ -140,7 +140,7 @@ use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
 
-our $VERSION = '0.21-TRIAL2';
+our $VERSION = '0.21-TRIAL3';
 
 use constant {
     _JWK_THUMBPRINT_DIGEST => 'sha256',

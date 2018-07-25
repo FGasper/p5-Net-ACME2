@@ -2,10 +2,12 @@ Revision history for Perl module Net::ACME2
 
 0.21
 - Make LetsEncrypt.pm default to the production server.
-- Acknowledge need for XS-based TLS functionality. This module can’t run
-  “anywhere that Perl runs” because of this. :-(
+- Make LetsEncrypt.pm accept an “environment” to simplify testing.
+- Pass constructor arguments to the HOST() method.
 - Make tests flex ECDSA keys as strenuously as they flex RSA keys.
 - Add aviso about speed to the main POD.
+- Acknowledge need for XS-based TLS functionality. This module can’t run
+  “anywhere that Perl runs” because of this. :-(
 
 0.2 19 Jun 2018
 - BREAKING: poll_authorization() and poll_order() now return the object’s
