@@ -28,8 +28,8 @@ use constant {
     #JWS_FORMAT => 'compact',   #v1 supported this?
 };
 
-*HOST = *_STAGING_SERVER;
+#*HOST = *_STAGING_SERVER;
 
-#*HOST = *_PRODUCTION_SERVER;
+*HOST = *_PRODUCTION_SERVER;
 
 1;
