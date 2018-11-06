@@ -100,7 +100,7 @@ it’s still not finalized; consequently, this distribution remains
 subject to change. It is expected that any further breaking changes
 will be small, but you still B<MUST> check the changelog before upgrading!
 
-B<NOTE>: As of version 0.24, Net::ACME2 implements the “POST-as-GET”
+B<NOTE>: As of version 0.25, Net::ACME2 implements the “POST-as-GET”
 logic described in the latest ACME protocol draft.
 
 =head1 FEATURES
@@ -143,7 +143,7 @@ use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use constant {
     _JWK_THUMBPRINT_DIGEST => 'sha256',
@@ -297,19 +297,6 @@ sub create_account {
     return 1;
 }
 
-#sub update_account {
-#    my ($self, %opts) = @_;
-#
-#    $self->_require_key_id(\%opts);
-#
-#    my $set = $self->_post_url(
-#        $opts{'kid'},
-#        \%opts,
-#    );
-#
-#    return $set;
-#}
-
 =head2 $order = I<OBJ>->create_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
@@ -347,42 +334,13 @@ The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 sub get_authorization {
     my ($self, $id) = @_;
 
-    my $resp = $self->{'_ua'}->get($id);
+    my $resp = $self->_post_as_get($id);
 
     return Net::ACME2::Authorization->new(
         id => $id,
         %{ $resp->content_struct() },
     );
 }
-
-#Server may not support! (Pebble doesn’t, and LE won’t?)
-#sub create_authorization {
-#    my ($self, $type, $value) = @_;
-#
-#    my %opts = (
-#        identifier => { type => $type, value => $value },
-#    );
-#
-#    $self->_require_key_id(\%opts);
-#
-#    return $self->_post( 'newAuthz', \%opts );
-#}
-
-#TODO: separate distribution?
-#sub __unix2iso {
-#    my ($unix) = @_;
-#
-#    my (@smhdmy) = gmtime $unix;
-#    $smhdmy[5] += 1900;
-#    $smhdmy[4]++;
-#
-#    return join( q<>,
-#        join( '-', @smhdmy[ 5, 4, 3 ] ),
-#        'T',
-#        join( ':', @smhdmy[ 2, 1, 0 ] ),
-#        'Z',
-#    );
-#}
 
 =head2 $str = I<OBJ>->make_key_authorization( $CHALLENGE )
 
@@ -406,7 +364,7 @@ sub make_key_authorization {
     return $challenge_obj->token() . '.' . $self->_key_thumbprint();
 }
 
-=head2 I<OBJ>->accept_challenge( CHALLENGE )
+=head2 I<OBJ>->accept_challenge( $CHALLENGE )
 
 Signal to the ACME server that the CHALLENGE is ready.
 
@@ -428,10 +386,10 @@ sub accept_challenge {
 =head2 $status = I<OBJ>->poll_authorization( $AUTHORIZATION )
 
 Accepts a L<Net::ACME2::Authorization> instance and polls the
-ACME server for that authorization’s status. The AUTHORIZATION
+ACME server for that authorization’s status. The $AUTHORIZATION
 object is then updated with the results of the poll.
 
-As a courtesy, this returns the object’s new C<status()>.
+As a courtesy, this returns the $AUTHORIZATION’s new C<status()>.
 
 =cut
 
@@ -615,6 +573,13 @@ sub _die_generic {
 use for it.
 
 =item * Expose the Retry-After header via the module API.
+
+=item * There is currently no way to fetch an order or challenge’s
+properties via URL. Prior to ACME’s adoption of “POST-as-GET” this was
+doable via a plain GET to the URL, but that’s no longer possible.
+If there’s a need, I’ll consider adding such logic to Net::ACME2.
+(It’s trivial to add; I’d just like to keep things as
+simple as possible.)
 
 =item * Add (more) tests.
 
