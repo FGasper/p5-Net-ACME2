@@ -72,9 +72,9 @@ X<Lets Encrypt> X<Let's Encrypt> X<letsencrypt>
         $acme->poll_order($order);
     }
 
-    my $certificate_url = $order->certificate();
+    # ... and now fetch the certificate chain:
 
-    # ... Download your certificate! :)
+    my $pem_chain = $acme->get_certificate_chain($order);
 
 See F</examples> in the distribution for more fleshed-out examples.
 
@@ -99,6 +99,9 @@ is L<in use for production|https://community.letsencrypt.org/t/acme-v2-productio
 it’s still not finalized; consequently, this distribution remains
 subject to change. It is expected that any further breaking changes
 will be small, but you still B<MUST> check the changelog before upgrading!
+
+B<NOTE>: As of version 0.24, Net::ACME2 implements the “POST-as-GET”
+logic described in the latest ACME protocol draft.
 
 =head1 FEATURES
 
@@ -140,7 +143,7 @@ use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use constant {
     _JWK_THUMBPRINT_DIGEST => 'sha256',
@@ -482,6 +485,21 @@ L<Net::ACME2::Order> object instead.
 
 *poll_order = *_poll_order_or_authz;
 
+=head2 $cert = I<OBJ>->get_certificate_chain( $ORDER )
+
+Fetches the $ORDER’s certificate chain and returns
+it in the format implied by the
+C<application/pem-certificate-chain> MIME type. See the ACME
+protocol specification for details about this format.
+
+=cut
+
+sub get_certificate_chain {
+    my ($self, $order) = @_;
+
+    return $self->_post_as_get( $order->certificate() )->content();
+}
+
 #----------------------------------------------------------------------
 
 sub _key_thumbprint {
@@ -520,7 +538,7 @@ sub _require_key_id {
 sub _poll_order_or_authz {
     my ($self, $order_or_authz_obj) = @_;
 
-    my $get = $self->{'_ua'}->get( $order_or_authz_obj->id() );
+    my $get = $self->_post_as_get( $order_or_authz_obj->id() );
 
     my $content = $get->content_struct();
 
@@ -559,6 +577,12 @@ sub _post {
     my $url = $self->_get_directory()->{$link_name} or _die_generic("Unknown link name: “$link_name”");
 
     return $self->_post_url( $url, $data, $post_method );
+}
+
+sub _post_as_get {
+    my ( $self, $url ) = @_;
+
+    return $self->_post_url( $url, q<> );
 }
 
 sub _post_url {
