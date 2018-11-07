@@ -109,7 +109,7 @@ logic described in the latest ACME protocol draft.
 
 =item * Support for both ECDSA and RSA encrytion.
 
-=item * Support for http-01, dns-01, and tls-alpn-01 challenges.
+=item * Support for http-01, dns-01, and L<tls-alpn-01|https://datatracker.ietf.org/doc/draft-ietf-acme-tls-alpn/> challenges.
 
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
