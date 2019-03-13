@@ -127,8 +127,9 @@ installation can be made faster.
 =cut
 
 use Crypt::Format;
-use Crypt::Perl::PK;
 use MIME::Base64 ();
+
+use Net::ACME2::AccountKey;
 
 use Net::ACME2::HTTP;
 use Net::ACME2::Order;
@@ -137,8 +138,6 @@ use Net::ACME2::Authorization;
 our $VERSION = '0.26';
 
 use constant {
-    _JWK_THUMBPRINT_DIGEST => 'sha256',
-
     _HTTP_OK => 200,
     _HTTP_CREATED => 201,
 };
@@ -454,7 +453,7 @@ sub get_certificate_chain {
 sub _key_thumbprint {
     my ($self) = @_;
 
-    return $self->{'_key_thumbprint'} ||= $self->_key_obj()->get_jwk_thumbprint( _JWK_THUMBPRINT_DIGEST() );
+    return $self->{'_key_thumbprint'} ||= $self->_key_obj()->get_jwk_thumbprint();
 }
 
 sub _get_directory {
@@ -499,7 +498,7 @@ sub _poll_order_or_authz {
 sub _key_obj {
     my ($self) = @_;
 
-    return $self->{'_key_obj'} ||= Crypt::Perl::PK::parse_key($self->{'_key'});
+    return $self->{'_key_obj'} ||= Net::ACME2::AccountKey->new($self->{'_key'});
 }
 
 sub _set_ua {

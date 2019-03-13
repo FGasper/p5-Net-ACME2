@@ -1,6 +1,6 @@
 # NAME
 
-Net::ACME2 - [IETF](https://www.ietf.org)-standard ACME (Let’s Encrypt) client
+Net::ACME2 - Client logic for the ACME (Let’s Encrypt) protocol
 
   
 
@@ -76,25 +76,16 @@ To use [Let’s Encrypt](http://letsencrypt.org), see
 
 # DESCRIPTION
 
-This library implements client logic for the [IETF](https://www.ietf.org)-standard ACME
-(Automated Certificate Management Environment) protocol. As of this
-writing, that protocol remains in development; the latest draft will
-be available from [https://datatracker.ietf.org/doc/draft-ietf-acme-acme/](https://datatracker.ietf.org/doc/draft-ietf-acme-acme/).
-
-Net::ACME2 derives from [Net::ACME](https://metacpan.org/pod/Net::ACME), which implements the
-(significantly different) earlier draft of that protocol as initially
-deployed by [Let’s Encrypt](http://letsencrypt.org).
+This library implements client logic for the
+ACME (Automated Certificate Management Environment) protocol, as
+standardized in [RFC 8555](https://www.rfc-editor.org/rfc/rfc8555.txt)
+and popularized by [Let’s Encrypt](http://letsencrypt.org).
 
 # STATUS
 
-This is a beta-grade implementation. While the underlying protocol
-is [in use for production](https://community.letsencrypt.org/t/acme-v2-production-environment-wildcards/55578),
-it’s still not finalized; consequently, this distribution remains
-subject to change. It is expected that any further breaking changes
-will be small, but you still **MUST** check the changelog before upgrading!
-
-**NOTE**: As of version 0.25, Net::ACME2 implements the “POST-as-GET”
-logic described in the latest ACME protocol draft.
+This is a production-grade implementation. While breaking changes at this
+point are unlikely, please always check the changelog before upgrading to
+a new version of this module.
 
 # FEATURES
 
@@ -236,6 +227,9 @@ simple as possible.)
 
 # SEE ALSO
 
-[Crypt::Perl](https://metacpan.org/pod/Crypt::Perl) provides pure-Perl cryptography for this library. See the
-present library distribution’s `/examples` directory for sample usage
+[Crypt::Perl](https://metacpan.org/pod/Crypt::Perl) provides this library’s cryptography backend. See
+this distribution’s `/examples` directory for sample usage
 to generate keys and CSRs.
+
+[Net::ACME](https://metacpan.org/pod/Net::ACME) implements client logic for the variant of this
+protocol that Let’s Encrypt first deployed.

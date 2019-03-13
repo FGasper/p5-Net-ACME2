@@ -1,5 +1,9 @@
 Revision history for Perl module Net::ACME2
 
+0.27
+- Prefer Crypt::OpenSSL::RSA or CryptX for crypto operations rather than
+  Crypt::Perl. This will provide a modest performance boost.
+
 0.26 11 March 2019
 - No production changes.
 - Upgrade declared status to production-ready.
