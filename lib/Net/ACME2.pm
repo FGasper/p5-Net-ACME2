@@ -119,10 +119,29 @@ I<almost> everywhere that Perl runs.
 All thrown exceptions are instances of L<Net::ACME2::X::Base>.
 Specific error classes aren’t yet defined.
 
-=head1 SPEED
+=head1 CRYPTOGRAPHY & SPEED
 
-If you notice speed problems, check to see if your L<Math::BigInt>
-installation can be made faster.
+L<Crypt::Perl> provides all cryptographic operations that this library
+needs using pure Perl. While this satisfies this module’s intent to be
+as pure-Perl as possible, there are a couple of significant drawbacks
+to this approach: firstly, it’s slower than XS-based code, and secondly,
+it loses the security benefits of the vetting that more widely-used
+cryptography libraries receive.
+
+To address these problems, Net::ACME2 will, after parsing a key, look
+for and prefer the following XS-based libraries for cryptography instead:
+
+=over
+
+=item * L<Crypt::OpenSSL::RSA> (based on L<OpenSSL|http://openssl.org>)
+
+=item * L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
+
+=back
+
+If the above are unavailable to you, then you may be able to speed up
+your L<Math::BigInt> installation; see that module’s documentation
+for more details.
 
 =cut
 
@@ -135,7 +154,7 @@ use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
 
-our $VERSION = '0.27-TRIAL1';
+our $VERSION = '0.27';
 
 use constant {
     _HTTP_OK => 200,
@@ -577,8 +596,8 @@ simple as possible.)
 
 =head1 SEE ALSO
 
-L<Crypt::Perl> provides this library’s cryptography backend. See
-this distribution’s F</examples> directory for sample usage
+L<Crypt::Perl> provides this library’s default cryptography backend.
+See this distribution’s F</examples> directory for sample usage
 to generate keys and CSRs.
 
 L<Net::ACME> implements client logic for the variant of this
