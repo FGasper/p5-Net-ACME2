@@ -1,5 +1,16 @@
 Revision history for Perl module Net::ACME2
 
+0.28
+- Fix debug=1 left in from previous change … oops.
+- Use Module::Runtime rather than Module::Load.
+- Make create_handler() optionally accept a Net::ACME2 instance in lieu
+  of the key authorization. This simplifies the use of that method a bit.
+- Net::ACME2::Challenge::error() now returns a Net::ACME2::Error instance
+  rather than a plain hash reference.
+- get_terms_of_service() is now callable as either a class method or an
+  instance method.
+- Improved documentation of error classes.
+
 0.27 18 March 2019
 - Prefer Crypt::OpenSSL::RSA or CryptX for cryptography rather than
   Crypt::Perl. This provides a modest performance boost and is likely
