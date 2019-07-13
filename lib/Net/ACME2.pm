@@ -154,7 +154,7 @@ use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use constant {
     _HTTP_OK => 200,

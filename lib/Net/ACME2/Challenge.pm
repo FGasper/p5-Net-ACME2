@@ -56,7 +56,14 @@ as a L<Net::ACME2::Error> instance (or undef if there is no error).
 sub error {
     my ($self) = @_;
 
-    return $self->{'_error'} && Net::ACME2::Error->new( %{ $self->{'_error'} } );
+    return $self->{'_error'} && do {
+        my $obj = Net::ACME2::Error->new( %{ $self->{'_error'} } );
+
+        # Do this to retain backward compatibility with pre-0.28 callers.
+        @{$obj}{ keys %{ $self->{'_error'} } } = values %{ $self->{'_error'} };
+
+        $obj;
+    };
 }
 
 1;

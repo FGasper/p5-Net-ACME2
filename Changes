@@ -1,7 +1,15 @@
 Revision history for Perl module Net::ACME2
 
+0.29 13 July 2019
+- Fix Net::ACME2::Challenge::error() breakage from 0.28.
+
 0.28 13 July 2019
-- WARNING: Net::ACME2::Challenge::error() now returns a Net::ACME2::Error
+- UPDATE: In fact, this change broke callers. 0.29 fixes it, and the error()
+  return will continue to include the necessary pieces to preserve backward
+  compatibility with pre-0.28 callers. The following note is retained for
+  historical interest:
+
+  WARNING: Net::ACME2::Challenge::error() now returns a Net::ACME2::Error
   instance rather than a plain hash reference. Since the internals of
   N::A2::Error line up with the hash reference, this should not break
   existing clients; however, the object’s internal state may eventually
