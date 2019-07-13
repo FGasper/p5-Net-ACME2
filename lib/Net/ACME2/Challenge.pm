@@ -48,8 +48,8 @@ These provide text strings as defined in the ACME specification.
 
 =back
 
-The C<error()> accessor provides the error object as a
-L<Net::ACME2::Error> instance (or undef if there is no error).
+An C<error()> accessor is also provided, which returns the error object
+as a L<Net::ACME2::Error> instance (or undef if there is no error).
 
 =cut
 

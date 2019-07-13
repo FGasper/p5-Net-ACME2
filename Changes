@@ -1,12 +1,17 @@
 Revision history for Perl module Net::ACME2
 
-0.28
+0.28 13 July 2019
+- WARNING: Net::ACME2::Challenge::error() now returns a Net::ACME2::Error
+  instance rather than a plain hash reference. Since the internals of
+  N::A2::Error line up with the hash reference, this should not break
+  existing clients; however, the object’s internal state may eventually
+  change, which *would* break any pre-0.28 callers. Implementors SHOULD
+  migrate to the object accessors before upgrading to this release.
 - Fix debug=1 left in from previous change … oops.
 - Use Module::Runtime rather than Module::Load.
-- Make create_handler() optionally accept a Net::ACME2 instance in lieu
-  of the key authorization. This simplifies the use of that method a bit.
-- Net::ACME2::Challenge::error() now returns a Net::ACME2::Error instance
-  rather than a plain hash reference.
+- Make http_01.pm’s create_handler() optionally accept a Net::ACME2 instance
+  in lieu of the key authorization. This simplifies the use of that method
+  a bit and makes it consistent with dns_01.pm’s get_record_value().
 - get_terms_of_service() is now callable as either a class method or an
   instance method.
 - Improved documentation of error classes.
