@@ -7,7 +7,7 @@ use warnings;
 
 =head1 NAME
 
-Net::ACME2 - Client logic for the ACME (Let’s Encrypt) protocol
+Net::ACME2 - Client logic for the ACME (Let's Encrypt) protocol
 
 X<Lets Encrypt> X<Let's Encrypt> X<letsencrypt>
 
