@@ -1,6 +1,6 @@
 Revision history for Perl module Net::ACME2
 
-0.31
+0.31 9 August 2019
 - Prevent nonce reuse.
 - Add badNonce retry (cf. RFC 8555/6.5).
 - Add http_timeout() method.
