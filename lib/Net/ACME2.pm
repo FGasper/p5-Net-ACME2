@@ -104,6 +104,8 @@ a new version of this module.
 
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
+=item * Retry POST (once) on C<badNonce> errors.
+
 =item * This is a pure-Perl solution. Most of its dependencies are
 either core modules or pure Perl themselves. XS is necessary to
 communicate with the ACME server via TLS; however, most Perl installations

@@ -109,17 +109,54 @@ sub _post {
 
     local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
 
-    return $self->_request_and_set_last_nonce(
-        'POST',
-        $url,
-        {
-            content => $jws,
-            headers => {
-                'content-type' => _CONTENT_TYPE,
+    my $pre_err = $@;
+
+    my $resp = eval {
+        $self->_request_and_set_last_nonce(
+            'POST',
+            $url,
+            {
+                content => $jws,
+                headers => {
+                    'content-type' => _CONTENT_TYPE,
+                },
             },
-        },
-        $opts_hr || (),
-    );
+            $opts_hr || (),
+        );
+    };
+
+    my $err;
+
+    if (!defined $resp) {
+        $err = $@;
+
+        if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
+            if ($self->{'_in_retry'}) {
+                warn( "$url: Received “badNonce” even in retry! Refuse to re-retry …\n" );
+            }
+            elsif ($self->{'_last_nonce'}) {
+                warn( "$url: Received “badNonce” error! Retrying …\n" );
+
+                local $self->{'_in_retry'} = 1;
+
+                # NB: The success of this depends on our having recorded
+                # the Replay-Nonce from the last response.
+                $resp = $self->_post(@_[ 1 .. $#_ ]);
+            }
+            else {
+                warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
+            }
+        }
+    }
+
+    if (!defined $resp) {
+        $@ = $err;
+        die;
+    }
+
+    $@ = $pre_err;
+
+    return $resp;
 }
 
 sub _ua_request {
@@ -254,10 +291,14 @@ sub _create_jwt {
 
     $self->_get_first_nonce() if !$self->{'_last_nonce'};
 
-    # While it’s possible that the POST request that will send this JWT
-    # will fail to reach the server, we’ll just request another nonce
-    # next time.
+    # Ideally we’d wait until we’ve confirmed that this JWT reached the
+    # server to delete the local nonce, but at this point a failure to
+    # reach the server seems pretty edge-case-y. Even if that happens,
+    # we’ll just request another nonce next time, so no big deal.
     my $nonce = delete $self->{'_last_nonce'};
+
+    # For testing badNonce retry:
+    # $nonce = reverse($nonce) if !$self->{'_in_retry'};
 
     return $self->{'_jwt_maker'}->$jwt_method(
         key_id => $self->{'_key_id'},
