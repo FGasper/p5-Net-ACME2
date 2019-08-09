@@ -27,6 +27,8 @@ use Net::ACME2::X              ();
 
 use constant _CONTENT_TYPE => 'application/jose+json';
 
+my $_MAX_RETRIES = 5;
+
 #accessed from tests
 our $_NONCE_HEADER = 'replay-nonce';
 
@@ -43,6 +45,8 @@ sub new {
         _ua       => $ua,
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
+
+        _retries_left => $_MAX_RETRIES,
     }, $class;
 
     return bless $self, $class;
@@ -131,17 +135,17 @@ sub _post {
         $err = $@;
 
         if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
-            if ($self->{'_in_retry'}) {
-                warn( "$url: Received “badNonce” even in retry! Refuse to re-retry …\n" );
+            if (!$self->{'_retries_left'}) {
+                warn( "$url: Received “badNonce” error, and no retries left!\n" );
             }
             elsif ($self->{'_last_nonce'}) {
 
                 # This scenario seems worth a warn() because even if the
                 # retry succeeds, something probably went awry somewhere.
 
-                warn( "$url: Received “badNonce” error! Retrying …\n" );
+                warn( "$url: Received “badNonce” error! Retrying ($self->{'_retries_left'} left) …\n" );
 
-                local $self->{'_in_retry'} = 1;
+                local $self->{'_retries_left'} = $self->{'_retries_left'} - 1;
 
                 # NB: The success of this depends on our having recorded
                 # the Replay-Nonce from the last response.
@@ -302,7 +306,8 @@ sub _create_jwt {
     my $nonce = delete $self->{'_last_nonce'};
 
     # For testing badNonce retry:
-    # $nonce = reverse($nonce) if !$self->{'_in_retry'};
+    # $nonce = reverse($nonce) if $self->{'_retries_left'};
+    # $nonce = reverse($nonce);
 
     return $self->{'_jwt_maker'}->$jwt_method(
         key_id => $self->{'_key_id'},
