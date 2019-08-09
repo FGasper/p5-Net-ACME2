@@ -135,6 +135,10 @@ sub _post {
                 warn( "$url: Received “badNonce” even in retry! Refuse to re-retry …\n" );
             }
             elsif ($self->{'_last_nonce'}) {
+
+                # This scenario seems worth a warn() because even if the
+                # retry succeeds, something probably went awry somewhere.
+
                 warn( "$url: Received “badNonce” error! Retrying …\n" );
 
                 local $self->{'_in_retry'} = 1;
