@@ -48,6 +48,12 @@ sub new {
     return bless $self, $class;
 }
 
+sub timeout {
+    my $self = shift;
+
+    return $self->{'_ua'}->timeout(@_);
+}
+
 sub set_key_id {
     my ($self, $key_id) = @_;
 
@@ -122,6 +128,19 @@ sub _ua_request {
     return $self->{'_ua'}->request( $type, @args );
 }
 
+sub _consume_nonce_in_headers {
+    my ($self, $headers_hr) = @_;
+
+    my $_nonce_header_lc = $_NONCE_HEADER;
+    $_nonce_header_lc =~ tr<A-Z><a-z>;
+
+    my $nonce = $headers_hr->{$_nonce_header_lc};
+
+    $self->{'_last_nonce'} = $nonce if $nonce;
+
+    return;
+}
+
 #overridden in tests
 sub _request {
     my ( $self, $type, @args ) = @_;
@@ -131,19 +150,12 @@ sub _request {
     #cf. eval_bug.readme
     my $eval_err = $@;
 
-    eval { $resp = $self->_ua_request( $type, @args ); };
-
-    # Check ref() first to avoid potentially running overload.pm’s
-    # stringification.
-    if (ref($@) || $@) {
+    eval { $resp = $self->_ua_request( $type, @args ); 1 } or do {
         my $exc = $@;
 
         if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
-            my $_nonce_header_lc = $_NONCE_HEADER;
-            $_nonce_header_lc =~ tr<A-Z><a-z>;
 
-            my $nonce = $exc->get('headers')->{$_nonce_header_lc};
-            $self->{'_last_nonce'} = $nonce if $nonce;
+            $self->_consume_nonce_in_headers( $exc->get('headers') );
 
             #If the exception is able to be made into a Net::ACME2::Error,
             #then do so to get a nicer error message.
@@ -166,7 +178,7 @@ sub _request {
 
         $@ = $exc;
         die;
-    }
+    };
 
     $@ = $eval_err;
 
@@ -211,8 +223,6 @@ sub _get_first_nonce {
 sub _create_jwt {
     my ( $self, $jwt_method, $url, $data ) = @_;
 
-    $self->_get_first_nonce() if !$self->{'_last_nonce'};
-
     $self->{'_jwt_maker'} ||= do {
         my $class;
 
@@ -242,11 +252,18 @@ sub _create_jwt {
         );
     };
 
+    $self->_get_first_nonce() if !$self->{'_last_nonce'};
+
+    # While it’s possible that the POST request that will send this JWT
+    # will fail to reach the server, we’ll just request another nonce
+    # next time.
+    my $nonce = delete $self->{'_last_nonce'};
+
     return $self->{'_jwt_maker'}->$jwt_method(
         key_id => $self->{'_key_id'},
         payload => $data,
         extra_headers => {
-            nonce => $self->{'_last_nonce'},
+            nonce => $nonce,
             url => $url,
         },
     );

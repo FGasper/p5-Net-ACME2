@@ -146,15 +146,15 @@ emptor.
 Returns the object’s cached key ID, either as given at instantiation
 or as fetched in `create_account()`.
 
+## _OBJ_->http\_timeout( \[$NEW\] )
+
+A passthrough interface to the underlying [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny) object’s
+`timeout()` method.
+
 ## $url = _CLASS_->get\_terms\_of\_service()
 
 Returns the URL for the terms of service. Callable as either
 a class method or an instance method.
-
-**NOTE:** For [Let’s Encrypt](http://letsencrypt.org) you can
-unofficially resolve against
-[https://acme-v01.api.letsencrypt.org/terms](https://acme-v01.api.letsencrypt.org/terms) to see the terms
-of service.
 
 ## $created\_yn = _OBJ_->create\_account( %OPTS )
 
@@ -241,6 +241,8 @@ simple as possible.)
 - Add (more) tests.
 
 # SEE ALSO
+
+[Crypt::LE](https://metacpan.org/pod/Crypt::LE) is another ACME client library.
 
 [Crypt::Perl](https://metacpan.org/pod/Crypt::Perl) provides this library’s default cryptography backend.
 See this distribution’s `/examples` directory for sample usage
