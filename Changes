@@ -1,11 +1,12 @@
 Revision history for Perl module Net::ACME2
 
 0.31
+- Prevent nonce reuse.
+- Add badNonce retry (cf. RFC 8555/6.5).
 - Add http_timeout() method.
 - Tweak internals not to reuse “_ua” for instances of 2 different classes.
-- Improve internal eval {} usage.
 - Replace legacy function names in demos and tests.
-- Prevent nonce reuse.
+- Improve internal eval {} usage.
 
 0.30 18 July 2019
 - Fix (internal?) error when newNonce is not called.
