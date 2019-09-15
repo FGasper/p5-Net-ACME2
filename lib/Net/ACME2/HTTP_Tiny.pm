@@ -40,9 +40,12 @@ use warnings;
 
 use parent qw( HTTP::Tiny );
 
+use Promise::ES6 ();
+
 use HTTP::Tiny::UA::Response ();
 
 use Net::ACME2::X ();
+use Net::ACME2::HTTP::Convert ();
 
 # This circular dependency is unfortunate, but PAUSE needs to see a static
 # $Net::ACME2::VERSION. (Thanks to Dan Book for pointing it out.)
@@ -90,37 +93,17 @@ sub request {
     #cf. eval_bug.readme
     my $eval_err = $@;
 
+use Data::Dumper;
+#print STDERR Dumper( request => $method, $url, $args_hr || () );
+
     my $resp = _base_request( $self, $method, $url, $args_hr || () );
+
+    my $resp2 = eval { Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp); };
+    my $err = $@;
 
     $@ = $eval_err;
 
-    my $resp_obj = HTTP::Tiny::UA::Response->new($resp);
-
-    #cf. HTTP::Tiny docs
-    if ( $resp_obj->status() == 599 ) {
-        die Net::ACME2::X->create(
-            'HTTP::Network',
-            {
-                method    => $method,
-                url       => $url,
-                error     => $resp_obj->content(),
-                redirects => $resp->{'redirects'},
-            }
-        );
-    }
-
-    if ( $resp->{'status'} >= 400 ) {
-        die Net::ACME2::X->create(
-            'HTTP::Protocol',
-            {
-                method    => $method,
-                redirects => $resp->{'redirects'},
-                ( map { ( $_ => $resp_obj->$_() ) } qw( content status reason url headers ) ),
-            },
-        );
-    }
-
-    return $resp_obj;
+    return $resp2 ? Promise::ES6->resolve($resp2) : Promise::ES6->reject($err);
 }
 
 1;

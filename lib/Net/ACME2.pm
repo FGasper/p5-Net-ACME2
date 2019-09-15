@@ -258,7 +258,7 @@ sub http_timeout {
 
 #----------------------------------------------------------------------
 
-=head2 $url = I<CLASS>->get_terms_of_service()
+=head2 promise($url) = I<CLASS>->get_terms_of_service()
 
 Returns the URL for the terms of service. Callable as either
 a class method or an instance method.
@@ -273,19 +273,21 @@ sub get_terms_of_service {
         $self = $self->_new_without_key_check();
     }
 
-    my $dir = $self->_get_directory();
+    return $self->_get_directory()->then( sub {
+        my $dir = shift;
 
-    # Exceptions here indicate an ACME violation and should be
-    # practically nonexistent.
-    my $url = $dir->{'meta'} or _die_generic('No “meta” in directory!');
-    $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
+        # Exceptions here indicate an ACME violation and should be
+        # practically nonexistent.
+        my $url = $dir->{'meta'} or _die_generic('No “meta” in directory!');
+        $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
 
-    return $url;
+        return $url;
+    } );
 }
 
 #----------------------------------------------------------------------
 
-=head2 $created_yn = I<OBJ>->create_account( %OPTS )
+=head2 promise($created_yn) = I<OBJ>->create_account( %OPTS )
 
 Creates an account using the ACME2 object’s key and the passed
 %OPTS, which are as described in the ACME2 spec (cf. C<newAccount>).
@@ -306,34 +308,33 @@ sub create_account {
         ($opts{$name} &&= JSON::true()) ||= JSON::false();
     }
 
-    my $resp = $self->_post(
-        'newAccount',
-        \%opts,
-    );
+    return $self->_post( 'newAccount', \%opts )->then( sub {
+        my ($resp) = @_;
 
-    $self->{'_key_id'} = $resp->header('location');
+        $self->{'_key_id'} = $resp->header('location');
 
-    $self->{'_http'}->set_key_id( $self->{'_key_id'} );
+        $self->{'_http'}->set_key_id( $self->{'_key_id'} );
 
-    return 0 if $resp->status() == _HTTP_OK;
+        return 0 if $resp->status() == _HTTP_OK;
 
-    $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+        $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
 
-    my $struct = $resp->content_struct();
+        my $struct = $resp->content_struct();
 
-    if ($struct) {
-        for my $name (newAccount_booleans()) {
-            next if !exists $struct->{$name};
-            ($struct->{$name} &&= 1) ||= 0;
+        if ($struct) {
+            for my $name (newAccount_booleans()) {
+                next if !exists $struct->{$name};
+                ($struct->{$name} &&= 1) ||= 0;
+            }
         }
-    }
 
-    return 1;
+        return 1;
+    } );
 }
 
 #----------------------------------------------------------------------
 
-=head2 $order = I<OBJ>->create_order( %OPTS )
+=head2 promise($order) = I<OBJ>->create_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
 ACME spec (cf. C<newOrder>). Boolean values may be given as simple
@@ -348,19 +349,21 @@ sub create_order {
 
     $self->_require_key_id(\%opts);
 
-    my $resp = $self->_post( 'newOrder', \%opts );
+    return $self->_post( 'newOrder', \%opts )->then( sub {
+        my ($resp) = @_;
 
-    $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+        $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
 
-    return Net::ACME2::Order->new(
-        id => $resp->header('location'),
-        %{ $resp->content_struct() },
-    );
+        return Net::ACME2::Order->new(
+            id => $resp->header('location'),
+            %{ $resp->content_struct() },
+        );
+    } );
 }
 
 #----------------------------------------------------------------------
 
-=head2 $authz = I<OBJ>->get_authorization( $URL )
+=head2 promise($authz) = I<OBJ>->get_authorization( $URL )
 
 Fetches the authorization’s information based on the given $URL
 and returns a L<Net::ACME2::Authorization> object.
@@ -372,12 +375,14 @@ The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 sub get_authorization {
     my ($self, $id) = @_;
 
-    my $resp = $self->_post_as_get($id);
+    return $self->_post_as_get($id)->then( sub {
+        my $resp = shift;
 
-    return Net::ACME2::Authorization->new(
-        id => $id,
-        %{ $resp->content_struct() },
-    );
+        return Net::ACME2::Authorization->new(
+            id => $id,
+            %{ $resp->content_struct() },
+        );
+    } );
 }
 
 #----------------------------------------------------------------------
@@ -406,7 +411,7 @@ sub make_key_authorization {
 
 #----------------------------------------------------------------------
 
-=head2 I<OBJ>->accept_challenge( $CHALLENGE )
+=head2 promise() = I<OBJ>->accept_challenge( $CHALLENGE )
 
 Signal to the ACME server that the CHALLENGE is ready.
 
@@ -415,19 +420,17 @@ Signal to the ACME server that the CHALLENGE is ready.
 sub accept_challenge {
     my ($self, $challenge_obj) = @_;
 
-    $self->_post_url(
+    return $self->_post_url(
         $challenge_obj->url(),
         {
             keyAuthorization => $self->make_key_authorization($challenge_obj),
         },
-    );
-
-    return;
+    )->then( sub { undef } );
 }
 
 #----------------------------------------------------------------------
 
-=head2 $status = I<OBJ>->poll_authorization( $AUTHORIZATION )
+=head2 promise($status) = I<OBJ>->poll_authorization( $AUTHORIZATION )
 
 Accepts a L<Net::ACME2::Authorization> instance and polls the
 ACME server for that authorization’s status. The $AUTHORIZATION
@@ -442,7 +445,7 @@ As a courtesy, this returns the $AUTHORIZATION’s new C<status()>.
 
 #----------------------------------------------------------------------
 
-=head2 $status = I<OBJ>->finalize_order( $ORDER, $CSR )
+=head2 promise($status) = I<OBJ>->finalize_order( $ORDER, $CSR )
 
 Finalizes an order and updates the $ORDER object with the returned
 status. $CSR may be in either DER or PEM format.
@@ -466,23 +469,25 @@ sub finalize_order {
 
     $csr = MIME::Base64::encode_base64url($csr_der);
 
-    my $post = $self->_post_url(
+    return $self->_post_url(
         $order_obj->finalize(),
         {
             csr => $csr,
         },
-    );
+    )->then( sub {
+        my $post = shift;
 
-    my $content = $post->content_struct();
+        my $content = $post->content_struct();
 
-    $order_obj->update($content);
+        $order_obj->update($content);
 
-    return $order_obj->status();
+        return $order_obj->status();
+    } );
 }
 
 #----------------------------------------------------------------------
 
-=head2 $status = I<OBJ>->poll_order( $ORDER )
+=head2 promise($status) = I<OBJ>->poll_order( $ORDER )
 
 Like C<poll_authorization()> but handles a
 L<Net::ACME2::Order> object instead.
@@ -493,7 +498,7 @@ L<Net::ACME2::Order> object instead.
 
 #----------------------------------------------------------------------
 
-=head2 $cert = I<OBJ>->get_certificate_chain( $ORDER )
+=head2 promise($cert) = I<OBJ>->get_certificate_chain( $ORDER )
 
 Fetches the $ORDER’s certificate chain and returns
 it in the format implied by the
@@ -505,7 +510,9 @@ protocol specification for details about this format.
 sub get_certificate_chain {
     my ($self, $order) = @_;
 
-    return $self->_post_as_get( $order->certificate() )->content();
+    return $self->_post_as_get( $order->certificate() )->then( sub {
+        return shift()->content();
+    } );
 }
 
 #----------------------------------------------------------------------
@@ -519,18 +526,28 @@ sub _key_thumbprint {
 sub _get_directory {
     my ($self) = @_;
 
-    $self->{'_directory'} ||= do {
+    my $promise;
+
+    if ($self->{'_directory'}) {
+        $promise = Promise::ES6->resolve($self->{'_directory'});
+    }
+
+    $promise = $self->{'_directory_promise'} ||= do {
         my $dir_path = $self->DIRECTORY_PATH();
-        $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->content_struct();
+        $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
+            return $self->{'_directory'} = shift()->content_struct();
+        } );
     };
 
-    my $new_nonce_url = $self->{'_directory'}{'newNonce'} or do {
-        _die_generic('Directory is missing “newNonce”.');
-    };
+    return $promise->then( sub {
+        my $new_nonce_url = $self->{'_directory'}{'newNonce'} or do {
+            _die_generic('Directory is missing “newNonce”.');
+        };
 
-    $self->{'_http'}->set_new_nonce_url( $new_nonce_url );
+        $self->{'_http'}->set_new_nonce_url( $new_nonce_url );
 
-    return $self->{'_directory'};
+        return $self->{'_directory'};
+    } );
 }
 
 sub _require_key_id {
@@ -546,13 +563,15 @@ sub _require_key_id {
 sub _poll_order_or_authz {
     my ($self, $order_or_authz_obj) = @_;
 
-    my $get = $self->_post_as_get( $order_or_authz_obj->id() );
+    return $self->_post_as_get( $order_or_authz_obj->id() )->then( sub {
+        my $get = shift;
 
-    my $content = $get->content_struct();
+        my $content = $get->content_struct();
 
-    $order_or_authz_obj->update($content);
+        $order_or_authz_obj->update($content);
 
-    return $order_or_authz_obj->status();
+        return $order_or_authz_obj->status();
+    } );
 }
 
 sub _key_obj {
@@ -580,11 +599,15 @@ sub _post {
     my $post_method;
     $post_method = 'post_full_jwt' if grep { $link_name eq $_ } FULL_JWT_METHODS();
 
-    # Since the $link_name will come from elsewhere in this module
-    # there really shouldn’t be an error here, but just in case.
-    my $url = $self->_get_directory()->{$link_name} or _die_generic("Unknown link name: “$link_name”");
+    return $self->_get_directory()->then( sub {
+        my $dir_hr = shift;
 
-    return $self->_post_url( $url, $data, $post_method );
+        # Since the $link_name will come from elsewhere in this module
+        # there really shouldn’t be an error here, but just in case.
+        my $url = $dir_hr->{$link_name} or _die_generic("Unknown link name: “$link_name”");
+
+        return $self->_post_url( $url, $data, $post_method );
+    } );
 }
 
 sub _post_as_get {
@@ -596,13 +619,13 @@ sub _post_as_get {
 sub _post_url {
     my ( $self, $url, $data, $opt_post_method ) = @_;
 
-    #Do this in case we haven’t initialized the directory yet.
-    #Initializing the directory is necessary to get a nonce.
-    $self->_get_directory();
-
     my $post_method = $opt_post_method || 'post_key_id';
 
-    return $self->{'_http'}->$post_method( $url, $data );
+    #Do this in case we haven’t initialized the directory yet.
+    #Initializing the directory is necessary to get a nonce.
+    return $self->_get_directory()->then( sub {
+        return $self->{'_http'}->$post_method( $url, $data );
+    } );
 }
 
 sub _die_generic {

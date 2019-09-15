@@ -31,90 +31,131 @@ sub run {
         key => $_test_key,
     );
 
+    my $key_id_promise;
+
     #conditional is for if you want to modify this example to use
     #a pre-existing account.
-    if (!$acme->key_id()) {
-        print "$/Indicate acceptance of the terms of service at:$/$/";
-        print "\t" . $acme->get_terms_of_service() . $/ . $/;
-        print "… by hitting ENTER now.$/";
-        <>;
+    if ($acme->key_id()) {
+        die "not for example";
+    }
+    else {
+        $key_id_promise = $acme->get_terms_of_service()->then( sub {
+            my $tos = shift;
 
-        my $created = $acme->create_account(
-            termsOfServiceAgreed => 1,
-        );
+            print "$/Indicate acceptance of the terms of service at:$/$/";
+            print "\t" . $tos . $/ . $/;
+            print "… by hitting ENTER now.$/";
+            <>;
+
+            return $acme->create_account(
+                termsOfServiceAgreed => 1,
+            );
+        } );
     }
 
-    my @domains = $class->_get_domains();
+    my $authzs_ar;
 
-    my $order = $acme->create_order(
-        identifiers => [ map { { type => 'dns', value => $_ } } @domains ],
-    );
+    my $poll_authzs_cr;
+    $poll_authzs_cr = sub {
+        my @promises;
 
-    my @authzs = map { $acme->get_authorization($_) } $order->authorizations();
-    my $valid_authz_count = 0;
-
-    for my $authz_obj (@authzs) {
-        my $domain = $authz_obj->identifier()->{'value'};
-
-        if ($authz_obj->status() eq 'valid') {
-            $valid_authz_count++;
-            print "$/This account is already authorized on $domain.$/";
-            next;
-        }
-
-        my $challenge = $class->_authz_handler($acme, $authz_obj);
-
-        $acme->accept_challenge($challenge);
-    }
-
-    while (1) {
-        for my $authz (@authzs) {
+        for my $authz (@$authzs_ar) {
             next if $authz->status() eq 'valid';
 
-            my $status = $acme->poll_authorization($authz);
+            push @promises, $acme->poll_authorization($authz)->then( sub {
+                my $status = shift;
 
-            my $name = $authz->identifier()->{'value'};
-            substr($name, 0, 0, '*.') if $authz->wildcard();
+                my $name = $authz->identifier()->{'value'};
+                substr($name, 0, 0, '*.') if $authz->wildcard();
 
-            if ($status eq 'valid') {
+                if ($status eq 'valid') {
 
-                print "$/“$name” has passed validation.$/";
-            }
-            elsif ($status eq 'pending') {
-                print "$/“$name”’s authorization is still pending …$/";
-            }
-            else {
-                if ($status eq 'invalid') {
-                    my $challenge = $class->_get_challenge_from_authz($authz);
-                    print Dumper($challenge);
+                    print "$/“$name” has passed validation.$/";
                 }
+                elsif ($status eq 'pending') {
+                    print "$/“$name”’s authorization is still pending …$/";
+                }
+                else {
+                    if ($status eq 'invalid') {
+                        my $challenge = $class->_get_challenge_from_authz($authz);
+                        print Dumper($challenge);
+                    }
 
-                die "$/“$name”’s authorization is in “$status” state.";
-            }
+                    die "$/“$name”’s authorization is in “$status” state.";
+                }
+            } );
         }
 
-        $valid_authz_count = grep { $_->status() eq 'valid' } @authzs;
-        last if $valid_authz_count == @authzs;
+        if (@promises) {
+            print "Waiting 1 second before polling authzs again …$/";
 
-        sleep 1;
-    }
+            sleep 1;
+            return Promise::ES6->all(\@promises)->then($poll_authzs_cr);
+        }
 
-    my ($key, $csr) = _make_key_and_csr_for_domains(@domains);
+        return undef;
+    };
 
-    print "Finalizing order …$/";
+    my (@domains, $order, $key, $csr);
 
-    $acme->finalize_order($order, $csr);
+    $key_id_promise->then( sub {
+        @domains = $class->_get_domains();
 
-    while ($order->status() ne 'valid') {
-        sleep 1;
-        $acme->poll_order($order);
-    }
+        return $acme->create_order(
+            identifiers => [ map { { type => 'dns', value => $_ } } @domains ],
+        );
+    } )->then( sub {
+        $order = shift;
 
-    print "Certificate key:$/$key$/$/";
+        return Promise::ES6->all(
+            [ map { $acme->get_authorization($_) } $order->authorizations() ],
+        );
+    } )->then( sub {
+        $authzs_ar = shift;
 
-    print "Certificate chain:$/$/";
+        my $valid_authz_count = 0;
 
-    print $acme->get_certificate_chain($order);
+        for my $authz_obj (@$authzs_ar) {
+            my $domain = $authz_obj->identifier()->{'value'};
+
+            if ($authz_obj->status() eq 'valid') {
+                $valid_authz_count++;
+                print "$/This account is already authorized on $domain.$/";
+                next;
+            }
+
+            my $challenge = $class->_authz_handler($acme, $authz_obj);
+
+            return $acme->accept_challenge($challenge);
+        }
+    } )->then($poll_authzs_cr)->then( sub {
+        ($key, $csr) = _make_key_and_csr_for_domains(@domains);
+
+        print "Finalizing order …$/";
+
+        my $verify_order_cr;
+        $verify_order_cr = sub {
+            if ($order->status() ne 'valid') {
+                print "Waiting 1 second before polling order again …$/";
+
+                sleep 1;
+
+                return $acme->poll_order($order)->then($verify_order_cr);
+            }
+        };
+
+        return $acme->finalize_order($order, $csr)->then($verify_order_cr);
+    } )->then( sub {
+        $acme->get_certificate_chain($order)->then( sub {
+            print "Certificate key:$/$key$/$/";
+
+            print "Certificate chain:$/";
+
+            print shift;
+        } );
+    } )->catch( sub {
+        print STDERR shift;
+    } );
 
     return;
 }

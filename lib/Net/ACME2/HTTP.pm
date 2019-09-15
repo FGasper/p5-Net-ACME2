@@ -45,8 +45,6 @@ sub new {
         _ua       => $ua,
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
-
-        _retries_left => $_MAX_RETRIES,
     }, $class;
 
     return bless $self, $class;
@@ -74,6 +72,7 @@ sub set_new_nonce_url {
     return $self;
 }
 
+# promise
 #GETs submit no data and thus are not signed.
 sub get {
     my ( $self, $url ) = @_;
@@ -81,6 +80,7 @@ sub get {
     return $self->_request( 'GET', $url );
 }
 
+# promise
 # ACME spec 6.2: for all requests not signed using an existing account,
 # e.g., newAccount
 sub post_full_jwt {
@@ -89,9 +89,12 @@ sub post_full_jwt {
     return $self->_post( 'create_full_jws', @_ );
 }
 
+# promise
 # ACME spec 6.2: for all requests signed using an existing account
 sub post_key_id {
     my $self = shift;
+use Data::Dumper;
+#print STDERR Dumper( post_key_id => \@_ );
 
     return $self->_post(
         'create_key_id_jws',
@@ -101,7 +104,8 @@ sub post_key_id {
 
 #----------------------------------------------------------------------
 
-#POSTs are signed.
+# promise
+# POSTs are signed.
 sub _post {
     my ( $self, $jwt_method, $url, $data, $opts_hr ) = @_;
 
@@ -109,14 +113,14 @@ sub _post {
     # without “key”.
     die "Constructor needed “key” to do POST! ($url)" if !$self->{'_acme_key'};
 
-    my $jws = $self->_create_jwt( $jwt_method, $url, $data );
+    my $retries_left = $_MAX_RETRIES;
 
-    local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
+    return $self->_create_jwt( $jwt_method, $url, $data )->then( sub {
+        my $jws = shift;
 
-    my $pre_err = $@;
+        local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
 
-    my $resp = eval {
-        $self->_request_and_set_last_nonce(
+        return $self->_request_and_set_last_nonce(
             'POST',
             $url,
             {
@@ -126,47 +130,42 @@ sub _post {
                 },
             },
             $opts_hr || (),
+        )->catch(
+            sub {
+                my ($err) = @_;
+
+                my $resp;
+
+                if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
+                    if (!$retries_left) {
+                        warn( "$url: Received “badNonce” error, and no retries left!\n" );
+                    }
+                    elsif ($self->{'_last_nonce'}) {
+
+                        # This scenario seems worth a warn() because even if the
+                        # retry succeeds, something probably went awry somewhere.
+
+                        warn( "$url: Received “badNonce” error! Retrying ($retries_left left) …\n" );
+
+                        $retries_left--;
+
+                        # NB: The success of this depends on our having recorded
+                        # the Replay-Nonce from the last response.
+                        return $self->_post(@_[ 1 .. $#_ ]);
+                    }
+                    else {
+                        warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
+                    }
+                }
+
+                local $@ = $err;
+                die;
+            }
         );
-    };
-
-    my $err;
-
-    if (!defined $resp) {
-        $err = $@;
-
-        if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
-            if (!$self->{'_retries_left'}) {
-                warn( "$url: Received “badNonce” error, and no retries left!\n" );
-            }
-            elsif ($self->{'_last_nonce'}) {
-
-                # This scenario seems worth a warn() because even if the
-                # retry succeeds, something probably went awry somewhere.
-
-                warn( "$url: Received “badNonce” error! Retrying ($self->{'_retries_left'} left) …\n" );
-
-                local $self->{'_retries_left'} = $self->{'_retries_left'} - 1;
-
-                # NB: The success of this depends on our having recorded
-                # the Replay-Nonce from the last response.
-                $resp = $self->_post(@_[ 1 .. $#_ ]);
-            }
-            else {
-                warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
-            }
-        }
-    }
-
-    if (!defined $resp) {
-        $@ = $err;
-        die;
-    }
-
-    $@ = $pre_err;
-
-    return $resp;
+    } );
 }
 
+# promise
 sub _ua_request {
     my ( $self, $type, @args ) = @_;
 
@@ -186,71 +185,74 @@ sub _consume_nonce_in_headers {
     return;
 }
 
-#overridden in tests
+# promise
+# overridden in tests
 sub _request {
     my ( $self, $type, @args ) = @_;
 
-    my $resp;
+    return $self->_ua_request( $type, @args )->then(
+        sub {
+            my $resp = shift;
 
-    #cf. eval_bug.readme
-    my $eval_err = $@;
+            return Net::ACME2::HTTP::Response->new($resp);
+        },
+        sub {
+            my $exc = shift;
 
-    eval { $resp = $self->_ua_request( $type, @args ); 1 } or do {
-        my $exc = $@;
+            if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
 
-        if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
+                $self->_consume_nonce_in_headers( $exc->get('headers') );
 
-            $self->_consume_nonce_in_headers( $exc->get('headers') );
+                #If the exception is able to be made into a Net::ACME2::Error,
+                #then do so to get a nicer error message.
+                my $acme_error = eval {
+                    Net::ACME2::Error->new(
+                        %{ JSON::decode_json( $exc->get('content') ) },
+                    );
+                };
 
-            #If the exception is able to be made into a Net::ACME2::Error,
-            #then do so to get a nicer error message.
-            my $acme_error = eval {
-                Net::ACME2::Error->new(
-                    %{ JSON::decode_json( $exc->get('content') ) },
-                );
-            };
-
-            if ($acme_error) {
-                die Net::ACME2::X->create(
-                    'ACME',
-                    {
-                        http => $exc,
-                        acme => $acme_error,
-                    },
-                );
+                if ($acme_error) {
+                    die Net::ACME2::X->create(
+                        'ACME',
+                        {
+                            http => $exc,
+                            acme => $acme_error,
+                        },
+                    );
+                }
             }
-        }
 
-        $@ = $exc;
-        die;
-    };
-
-    $@ = $eval_err;
-
-    return Net::ACME2::HTTP::Response->new($resp);
+            $@ = $exc;
+            die;
+        },
+    );
 }
 
+# promise
 sub _request_and_set_last_nonce {
     my ( $self, $type, $url, @args ) = @_;
 
-    my $resp = $self->_request( $type, $url, @args );
+    return $self->_request( $type, $url, @args )->then( sub {
+        my ($resp) = @_;
 
-    #NB: ACME’s replay protection works thus:
-    #   - each server response includes a nonce
-    #   - each request must include ONE of the nonces that have been sent
-    #   - once used, a nonce can’t be reused
-    #
-    #This is subtly different from what was originally in mind (i.e., that
-    #each request must use the most recently sent nonce). It implies that GETs
-    #do not need to send nonces, though each GET will *receive* a nonce that
-    #may be used.
-    $self->{'_last_nonce'} = $resp->header($_NONCE_HEADER) or do {
-        die Net::ACME2::X->create('Generic', "Received no $_NONCE_HEADER from $url!");
-    };
+        # NB: ACME’s replay protection works thus:
+        #   - each server response includes a nonce
+        #   - each request must include ONE of the nonces that have been sent
+        #   - once used, a nonce can’t be reused
+        #
+        # This is subtly different from what was originally in mind (i.e., that
+        # each request must use the most recently sent nonce). It implies that
+        # GETs do not need to send nonces, though each GET will *receive* a
+        # nonce that may be used.
+        $self->{'_last_nonce'} = $resp->header($_NONCE_HEADER) or do {
+            die Net::ACME2::X->create('Generic', "Received no $_NONCE_HEADER from $url!");
+        };
 
-    return $resp;
+        return $resp;
+    } );
 }
 
+# promise
 sub _get_first_nonce {
     my ($self) = @_;
 
@@ -260,11 +262,10 @@ sub _get_first_nonce {
         die Net::ACME2::X->create('Generic', 'Set newNonce URL first!');
     };
 
-    $self->_request_and_set_last_nonce( 'HEAD', $url );
-
-    return;
+    return $self->_request_and_set_last_nonce( 'HEAD', $url );
 }
 
+# promise
 sub _create_jwt {
     my ( $self, $jwt_method, $url, $data ) = @_;
 
@@ -297,26 +298,37 @@ sub _create_jwt {
         );
     };
 
-    $self->_get_first_nonce() if !$self->{'_last_nonce'};
+    my $todo_after_first_nonce_cr = sub {
 
-    # Ideally we’d wait until we’ve confirmed that this JWT reached the
-    # server to delete the local nonce, but at this point a failure to
-    # reach the server seems pretty edge-case-y. Even if that happens,
-    # we’ll just request another nonce next time, so no big deal.
-    my $nonce = delete $self->{'_last_nonce'};
+        # Ideally we’d wait until we’ve confirmed that this JWT reached the
+        # server to delete the local nonce, but at this point a failure to
+        # reach the server seems pretty edge-case-y. Even if that happens,
+        # we’ll just request another nonce next time, so no big deal.
+        my $nonce = delete $self->{'_last_nonce'};
 
-    # For testing badNonce retry:
-    # $nonce = reverse($nonce) if $self->{'_retries_left'};
-    # $nonce = reverse($nonce);
+        # For testing badNonce retry … TODO FIXME:
+        # $nonce = reverse($nonce) if $self->{'_retries_left'};
+        # $nonce = reverse($nonce);
 
-    return $self->{'_jwt_maker'}->$jwt_method(
-        key_id => $self->{'_key_id'},
-        payload => $data,
-        extra_headers => {
-            nonce => $nonce,
-            url => $url,
-        },
-    );
+        return $self->{'_jwt_maker'}->$jwt_method(
+            key_id => $self->{'_key_id'},
+            payload => $data,
+            extra_headers => {
+                nonce => $nonce,
+                url => $url,
+            },
+        );
+    };
+
+    my $promise;
+    if ($self->{'_last_nonce'}) {
+        $promise = Promise::ES6->resolve(undef);
+    }
+    else {
+        $promise = $self->_get_first_nonce();
+    }
+
+    return $promise->then($todo_after_first_nonce_cr);
 }
 
 1;
