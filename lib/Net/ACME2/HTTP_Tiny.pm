@@ -90,20 +90,13 @@ sub request {
     #error is in the $resp variable already. Clobbering also risks
     #action-at-a-distance problems, so prevent it here.
 
-    #cf. eval_bug.readme
-    my $eval_err = $@;
+    return Promise::ES6->new( sub {
+        my ($res) = @_;
 
-use Data::Dumper;
-#print STDERR Dumper( request => $method, $url, $args_hr || () );
+        my $resp = _base_request( $self, $method, $url, $args_hr || () );
 
-    my $resp = _base_request( $self, $method, $url, $args_hr || () );
-
-    my $resp2 = eval { Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp); };
-    my $err = $@;
-
-    $@ = $eval_err;
-
-    return $resp2 ? Promise::ES6->resolve($resp2) : Promise::ES6->reject($err);
+        $res->( Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp) );
+    } );
 }
 
 1;

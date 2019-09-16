@@ -152,12 +152,12 @@ or as fetched in `create_account()`.
 A passthrough interface to the underlying [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny) object’s
 `timeout()` method.
 
-## $url = _CLASS_->get\_terms\_of\_service()
+## promise($url) = _CLASS_->get\_terms\_of\_service()
 
 Returns the URL for the terms of service. Callable as either
 a class method or an instance method.
 
-## $created\_yn = _OBJ_->create\_account( %OPTS )
+## promise($created\_yn) = _OBJ_->create\_account( %OPTS )
 
 Creates an account using the ACME2 object’s key and the passed
 %OPTS, which are as described in the ACME2 spec (cf. `newAccount`).
@@ -168,7 +168,7 @@ or 0 if the account already existed.
 
 NB: `create_new_account()` is an alias for this method.
 
-## $order = _OBJ_->create\_order( %OPTS )
+## promise($order) = _OBJ_->create\_order( %OPTS )
 
 Returns a [Net::ACME2::Order](https://metacpan.org/pod/Net::ACME2::Order) object. %OPTS is as described in the
 ACME spec (cf. `newOrder`). Boolean values may be given as simple
@@ -176,7 +176,7 @@ Perl booleans.
 
 NB: `create_new_order()` is an alias for this method.
 
-## $authz = _OBJ_->get\_authorization( $URL )
+## promise($authz) = _OBJ_->get\_authorization( $URL )
 
 Fetches the authorization’s information based on the given $URL
 and returns a [Net::ACME2::Authorization](https://metacpan.org/pod/Net::ACME2::Authorization) object.
@@ -195,11 +195,11 @@ domains’ document roots, then look at the handler logic in
 [Net::ACME2::Challenge::http\_01](https://metacpan.org/pod/Net::ACME2::Challenge::http_01) for a potentially simpler way to
 handle HTTP challenges.
 
-## _OBJ_->accept\_challenge( $CHALLENGE )
+## promise() = _OBJ_->accept\_challenge( $CHALLENGE )
 
 Signal to the ACME server that the CHALLENGE is ready.
 
-## $status = _OBJ_->poll\_authorization( $AUTHORIZATION )
+## promise($status) = _OBJ_->poll\_authorization( $AUTHORIZATION )
 
 Accepts a [Net::ACME2::Authorization](https://metacpan.org/pod/Net::ACME2::Authorization) instance and polls the
 ACME server for that authorization’s status. The $AUTHORIZATION
@@ -207,7 +207,7 @@ object is then updated with the results of the poll.
 
 As a courtesy, this returns the $AUTHORIZATION’s new `status()`.
 
-## $status = _OBJ_->finalize\_order( $ORDER, $CSR )
+## promise($status) = _OBJ_->finalize\_order( $ORDER, $CSR )
 
 Finalizes an order and updates the $ORDER object with the returned
 status. $CSR may be in either DER or PEM format.
@@ -216,12 +216,12 @@ As a courtesy, this returns the $ORDER’s `status()`. If this does
 not equal `valid`, then you should probably `poll_order()`
 until it does.
 
-## $status = _OBJ_->poll\_order( $ORDER )
+## promise($status) = _OBJ_->poll\_order( $ORDER )
 
 Like `poll_authorization()` but handles a
 [Net::ACME2::Order](https://metacpan.org/pod/Net::ACME2::Order) object instead.
 
-## $cert = _OBJ_->get\_certificate\_chain( $ORDER )
+## promise($cert) = _OBJ_->get\_certificate\_chain( $ORDER )
 
 Fetches the $ORDER’s certificate chain and returns
 it in the format implied by the

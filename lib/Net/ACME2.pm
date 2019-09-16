@@ -528,25 +528,32 @@ sub _get_directory {
 
     my $promise;
 
+    $self->{'_directory'} ||= undef;
+    my $dir_sr = \$self->{'_directory'};
+
     if ($self->{'_directory'}) {
         $promise = Promise::ES6->resolve($self->{'_directory'});
     }
-
-    $promise = $self->{'_directory_promise'} ||= do {
+    else {
         my $dir_path = $self->DIRECTORY_PATH();
-        $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
-            return $self->{'_directory'} = shift()->content_struct();
-        } );
-    };
+        $promise = $self->{'_directory_promise'} ||= do {
+            $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
+                return $$dir_sr = shift()->content_struct();
+            } );
+        };
+    }
+
+    my $http = $self->{'_http'};
 
     return $promise->then( sub {
-        my $new_nonce_url = $self->{'_directory'}{'newNonce'} or do {
-            _die_generic('Directory is missing “newNonce”.');
+        my $dir_hr = $$dir_sr;
+        my $new_nonce_url = $dir_hr->{'newNonce'} or do {
+            _die_generic('Directory lacks “newNonce”.');
         };
 
-        $self->{'_http'}->set_new_nonce_url( $new_nonce_url );
+        $http->set_new_nonce_url( $new_nonce_url );
 
-        return $self->{'_directory'};
+        return $dir_hr;
     } );
 }
 
@@ -621,10 +628,12 @@ sub _post_url {
 
     my $post_method = $opt_post_method || 'post_key_id';
 
+    my $http = $self->{'_http'};
+
     #Do this in case we haven’t initialized the directory yet.
     #Initializing the directory is necessary to get a nonce.
     return $self->_get_directory()->then( sub {
-        return $self->{'_http'}->$post_method( $url, $data );
+        return $http->$post_method( $url, $data );
     } );
 }
 
@@ -635,6 +644,10 @@ sub _die_generic {
 #legacy aliases
 *create_new_account = *create_account;
 *create_new_order = *create_order;
+
+# sub DESTROY {
+#     print "ACME2 destroyed at ${^GLOBAL_PHASE}\n";
+# }
 
 1;
 

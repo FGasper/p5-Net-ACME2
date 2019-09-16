@@ -93,8 +93,6 @@ sub post_full_jwt {
 # ACME spec 6.2: for all requests signed using an existing account
 sub post_key_id {
     my $self = shift;
-use Data::Dumper;
-#print STDERR Dumper( post_key_id => \@_ );
 
     return $self->_post(
         'create_key_id_jws',
@@ -190,41 +188,42 @@ sub _consume_nonce_in_headers {
 sub _request {
     my ( $self, $type, @args ) = @_;
 
-    return $self->_ua_request( $type, @args )->then(
+    my $promise = $self->_ua_request( $type, @args );
+
+
+    return $promise->then(
         sub {
-            my $resp = shift;
-
-            return Net::ACME2::HTTP::Response->new($resp);
+            return Net::ACME2::HTTP::Response->new($_[0]);
         },
-        sub {
-            my $exc = shift;
-
-            if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
-
-                $self->_consume_nonce_in_headers( $exc->get('headers') );
-
-                #If the exception is able to be made into a Net::ACME2::Error,
-                #then do so to get a nicer error message.
-                my $acme_error = eval {
-                    Net::ACME2::Error->new(
-                        %{ JSON::decode_json( $exc->get('content') ) },
-                    );
-                };
-
-                if ($acme_error) {
-                    die Net::ACME2::X->create(
-                        'ACME',
-                        {
-                            http => $exc,
-                            acme => $acme_error,
-                        },
-                    );
-                }
-            }
-
-            $@ = $exc;
-            die;
-        },
+#        sub {
+#            my $exc = shift;
+#
+#            if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
+#
+#                $self->_consume_nonce_in_headers( $exc->get('headers') );
+#
+#                #If the exception is able to be made into a Net::ACME2::Error,
+#                #then do so to get a nicer error message.
+#                my $acme_error = eval {
+#                    Net::ACME2::Error->new(
+#                        %{ JSON::decode_json( $exc->get('content') ) },
+#                    );
+#                };
+#
+#                if ($acme_error) {
+#                    die Net::ACME2::X->create(
+#                        'ACME',
+#                        {
+#                            http => $exc,
+#                            acme => $acme_error,
+#                        },
+#                    );
+#                }
+#            }
+#
+#            $@ = $exc;
+#            die;
+#        },
     );
 }
 

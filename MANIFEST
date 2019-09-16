@@ -21,8 +21,10 @@ lib/Net/ACME2/Challenge/dns_01.pm
 lib/Net/ACME2/Challenge/http_01.pm
 lib/Net/ACME2/Challenge/http_01/Handler.pm
 lib/Net/ACME2/Challenge/tls_alpn_01.pm
+lib/Net/ACME2/Curl.pm
 lib/Net/ACME2/Error.pm
 lib/Net/ACME2/HTTP.pm
+lib/Net/ACME2/HTTP/Convert.pm
 lib/Net/ACME2/HTTP/Response.pm
 lib/Net/ACME2/HTTP_Tiny.pm
 lib/Net/ACME2/JWTMaker.pm

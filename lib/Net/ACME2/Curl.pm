@@ -26,19 +26,19 @@ sub request {
     $_ = q<> for my ($head, $body);
 
     my $easy = Net::Curl::Easy->new();
-    $easy->setopt( CURLOPT_USERAGENT(), $self->_get_ua_string() );
-    $easy->setopt( CURLOPT_URL(), $url );
-    $easy->setopt( CURLOPT_HEADERDATA, \$head );
-    $easy->setopt( CURLOPT_FILE, \$body );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_USERAGENT(), $self->_get_ua_string() );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_URL(), $url );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_HEADERDATA(), \$head );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_FILE(), \$body );
 
     _assign_headers( $args_hr->{'headers'}, $easy );
 
     if ($method eq 'POST') {
-        $easy->setopt( CURLOPT_POST, 1 );
+        $easy->setopt( Net::Curl::Easy::CURLOPT_POST(), 1 );
 
         if (defined $args_hr->{'content'}) {
             $easy->setopt(
-                CURLOPT_COPYPOSTFIELDS(),
+                Net::Curl::Easy::CURLOPT_COPYPOSTFIELDS(),
                 $args_hr->{'content'},
             );
         }
@@ -54,7 +54,7 @@ sub request {
         sub {
             return {
                 success => 0,
-                url => $easy->getinfo( CURLINFO_EFFECTIVE_URL() ),
+                url => $easy->getinfo( Net::Curl::Easy::CURLINFO_EFFECTIVE_URL() ),
                 status => 599,
                 reason => q<>,
                 content => q<> . shift(),
@@ -71,7 +71,7 @@ sub request {
 sub _imitate_http_tiny {
     my ($easy, $head, $body) = @_;
 
-    my $status_code = $easy->getinfo( CURLINFO_RESPONSE_CODE() );
+    my $status_code = $easy->getinfo( Net::Curl::Easy::CURLINFO_RESPONSE_CODE() );
 
     my %headers;
     for my $line ( split m<\x0d?\x0a>, $head ) {
@@ -93,7 +93,7 @@ sub _imitate_http_tiny {
 
     my %resp = (
         success => ($status_code >= 200) && ($status_code <= 299),
-        url => $easy->getinfo( CURLINFO_EFFECTIVE_URL() ),
+        url => $easy->getinfo( Net::Curl::Easy::CURLINFO_EFFECTIVE_URL() ),
         status => $status_code,
         #reason => ...,
         content => $body,
