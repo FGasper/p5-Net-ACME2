@@ -23,13 +23,16 @@ sub _get_ua_string {
 sub request {
     my ($self, $method, $url, $args_hr) = @_;
 
-    $_ = q<> for my ($head, $body);
-
     my $easy = Net::Curl::Easy->new();
+
+    $easy->setopt( Net::Curl::Easy::CURLOPT_VERBOSE(), 1 );
+
+    $_ = q<> for @{$easy}{ qw( _head _body ) };
+
     $easy->setopt( Net::Curl::Easy::CURLOPT_USERAGENT(), $self->_get_ua_string() );
     $easy->setopt( Net::Curl::Easy::CURLOPT_URL(), $url );
-    $easy->setopt( Net::Curl::Easy::CURLOPT_HEADERDATA(), \$head );
-    $easy->setopt( Net::Curl::Easy::CURLOPT_FILE(), \$body );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_HEADERDATA(), \$easy->{'_head'} );
+    $easy->setopt( Net::Curl::Easy::CURLOPT_FILE(), \$easy->{'_body'} );
 
     _assign_headers( $args_hr->{'headers'}, $easy );
 
@@ -43,13 +46,20 @@ sub request {
             );
         }
     }
+    elsif ($method eq 'HEAD') {
+
+        # e.g., HEAD
+        $easy->setopt( Net::Curl::Easy::CURLOPT_NOBODY(), 1 );
+    }
     elsif ($method ne 'GET') {
-        die "bad method: [$method]";
+        die "Bad HTTP method: [$method]";
     }
 
-    return $self->{'_promiser'}->then(
+    my $p1 = $self->{'_promiser'}->add_handle($easy)->then(
         sub {
-            return _imitate_http_tiny( shift(), $head, $body );
+            my ($easy) = @_;
+
+            return _imitate_http_tiny( shift(), @{$easy}{'_head', '_body'} );
         },
         sub {
             return {
@@ -61,7 +71,9 @@ sub request {
                 headers => {},
             };
         },
-    )->then( sub {
+    );
+
+    return $p1->then( sub {
         my ($resp) = @_;
 
         return Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp);
@@ -73,21 +85,34 @@ sub _imitate_http_tiny {
 
     my $status_code = $easy->getinfo( Net::Curl::Easy::CURLINFO_RESPONSE_CODE() );
 
+    my $reason;
+
     my %headers;
     for my $line ( split m<\x0d?\x0a>, $head ) {
-        my ($name, $value) = split m<\s*:\s*>, $line;
-        $name =~ tr<A-Z><a-z>;
+        if (defined $reason) {
+            my ($name, $value) = split m<\s*:\s*>, $line, 2;
+            $name =~ tr<A-Z><a-z>;
 
-        if (exists $headers{$name}) {
-            if (ref $headers{$name}) {
-                push @{$headers{$name}}, $value;
+            if (exists $headers{$name}) {
+                if (ref $headers{$name}) {
+                    push @{$headers{$name}}, $value;
+                }
+                else {
+                    $headers{$name} = [ $headers{$name}, $value ];
+                }
             }
             else {
-                $headers{$name} = [ $headers{$name}, $value ];
+                $headers{$name} = $value;
             }
         }
         else {
-            $headers{$name} = $value;
+            if ( $line =~ m<.+? \s+ .+? \s+ (.*)>x ) {
+                $reason = $1;
+            }
+            else {
+                $reason = q<>;
+                warn "Unparsable first header line: [$line]\n";
+            }
         }
     }
 
@@ -95,7 +120,7 @@ sub _imitate_http_tiny {
         success => ($status_code >= 200) && ($status_code <= 299),
         url => $easy->getinfo( Net::Curl::Easy::CURLINFO_EFFECTIVE_URL() ),
         status => $status_code,
-        #reason => ...,
+        reason => $reason,
         content => $body,
         headers => \%headers,
     );

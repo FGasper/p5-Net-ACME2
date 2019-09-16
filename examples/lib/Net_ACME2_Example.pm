@@ -24,6 +24,43 @@ use constant {
     CAN_WILDCARD => 0,
 };
 
+sub _finish_http_curl {
+    my ($http) = @_;
+
+    use lib '/Users/felipe/code/p5-Data-FDSet/lib';
+    use Data::FDSet;
+
+    $_ = Data::FDSet->new() for my ($rout, $wout, $eout);
+
+    while ($http->handles()) {
+        ($$rout, $$wout) = $http->get_vecs();
+        my $timeout = $http->get_timeout() / 1000;
+
+# my $handles = $http->handles();
+# printf "$handles handles; waiting $timeout secs (%v.02x-%v.02x)\n", $$rout, $$wout;
+        my $got = $timeout && select $$rout, $$wout, $$eout, $timeout;
+# print "got $got\n";
+
+        if ($got == 0) {
+            $http->time_out();
+        }
+        elsif ($got > 0) {
+            for my $fd ( $http->get_all_fds() ) {
+                warn "problem (?) on FD $fd!" if $eout->has($fd);
+            }
+
+            my @rdrs = $http->get_read_fds();
+            my @wtrs = $http->get_write_fds();
+# print "read: [@rdrs]\nwrite: [@wtrs]\n";
+
+            $http->process( \@wtrs, \@rdrs );
+        }
+        else {
+            die "select(): $!";
+        }
+    }
+}
+
 sub run {
     my ($class) = @_;
 
@@ -31,8 +68,15 @@ sub run {
 
     my $_test_key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
 
+use lib '/Users/felipe/code/p5-Net-Curl-Promiser/lib';
+require Net::Curl::Promiser::Select;
+require Net::ACME2::Curl;
+
+    my $promiser = Net::Curl::Promiser::Select->new();
+
     my $acme = Net::ACME2::LetsEncrypt->new(
         environment => 'staging',
+        http_ua => Net::ACME2::Curl->new($promiser),
         key => $_test_key,
     );
 
@@ -52,9 +96,14 @@ sub run {
             print "… by hitting ENTER now.$/";
             <>;
 
-            return $acme->create_account(
+            my $acct_promise = $acme->create_account(
                 termsOfServiceAgreed => 1,
             );
+
+use Data::Dumper;
+#print STDERR Dumper(acct_promise => $acct_promise);
+
+            return $acct_promise;
         } );
     }
 
@@ -63,6 +112,7 @@ sub run {
     my (@domains, $order, $key, $csr);
 
     $key_id_promise->then( sub {
+print "order done\n";
         @domains = $class->_get_domains();
 
         return $acme->create_order(
@@ -157,6 +207,8 @@ sub run {
         my $msg = shift;
         print STDERR "FAILURE: " . ( eval { $msg->get_message() } // $msg ) . $/;
     } );
+
+    _finish_http_curl($promiser);
 
     return;
 }

@@ -217,6 +217,7 @@ sub _new_without_key_check {
         _key  => $opts{'key'},
         _key_id => $opts{'key_id'},
         _directory => $opts{'directory'},
+        _http_ua => $opts{'http_ua'},
     };
 
     bless $self, $class;
@@ -593,6 +594,7 @@ sub _set_http {
     $self->{'_http'} = Net::ACME2::HTTP->new(
         key => $self->{'_key'} && $self->_key_obj(),
         key_id => $self->{'_key_id'},
+        ua => $self->{'_http_ua'},
     );
 
     return;

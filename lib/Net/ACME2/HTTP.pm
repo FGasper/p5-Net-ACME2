@@ -39,10 +39,13 @@ our $verify_SSL = 1;
 sub new {
     my ( $class, %opts ) = @_;
 
-    my $ua = Net::ACME2::HTTP_Tiny->new( verify_SSL => $verify_SSL );
+    $opts{'ua'} ||= do {
+        require Net::ACME2::HTTP_Tiny;
+        Net::ACME2::HTTP_Tiny->new( verify_SSL => $verify_SSL );
+    };
 
     my $self = bless {
-        _ua       => $ua,
+        _ua       => $opts{'ua'},
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
     }, $class;
