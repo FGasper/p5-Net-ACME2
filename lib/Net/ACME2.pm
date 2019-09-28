@@ -147,6 +147,27 @@ for more details.
 
 =cut
 
+=head1 SYNCHRONOUS VS. ASYNCHRONOUS MODE
+
+By default, Net::ACME2 runs synchronously, so all I/O operations block.
+
+To facilitate asynchronous operation, you now may give an C<http_ua>
+to C<new()>. This value must be an object that implements C<request()>.
+That method should mimic L<HTTP::Tiny>’s method of the same name
+B<except> that, instead of returning a hash reference, it should return
+a promise-like object that implements C<then()>. That promise’s resolution
+should mimic C<HTTP::Tiny::request()>’s return value.
+
+When a Net::ACME2 instance is initialized with C<http_ua>, several of the
+methods described below return promises. These promises resolve to the values
+that otherwise would be returned directly in synchronous mode. Any exception
+that would be thrown in synchronous mode is given as the promise’s rejection
+value.
+
+=cut
+
+#----------------------------------------------------------------------
+
 use Crypt::Format;
 use MIME::Base64 ();
 
@@ -196,6 +217,9 @@ if you have it.
 directory contents. Saves a round-trip to the ACME2 server, but there’s
 no built-in logic to determine when the cache goes invalid. Caveat
 emptor.
+
+=item * C<http_ua> - Optional. Provides a custom HTTP UA object. This object
+B<MUST> implement the interface described in L</ASYNCHRONOUS MODE>.
 
 =back
 
@@ -274,16 +298,18 @@ sub get_terms_of_service {
         $self = $self->_new_without_key_check();
     }
 
-    return $self->_get_directory()->then( sub {
-        my $dir = shift;
+    return $self->_depromise(
+        $self->_get_directory()->then( sub {
+            my $dir = shift;
 
-        # Exceptions here indicate an ACME violation and should be
-        # practically nonexistent.
-        my $url = $dir->{'meta'} or _die_generic('No “meta” in directory!');
-        $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
+            # Exceptions here indicate an ACME violation and should be
+            # practically nonexistent.
+            my $url = $dir->{'meta'} or _die_generic('No “meta” in directory!');
+            $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
 
-        return $url;
-    } );
+            return $url;
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -309,28 +335,30 @@ sub create_account {
         ($opts{$name} &&= JSON::true()) ||= JSON::false();
     }
 
-    return $self->_post( 'newAccount', \%opts )->then( sub {
-        my ($resp) = @_;
+    return $self->_depromise(
+        $self->_post( 'newAccount', \%opts )->then( sub {
+            my ($resp) = @_;
 
-        $self->{'_key_id'} = $resp->header('location');
+            $self->{'_key_id'} = $resp->header('location');
 
-        $self->{'_http'}->set_key_id( $self->{'_key_id'} );
+            $self->{'_http'}->set_key_id( $self->{'_key_id'} );
 
-        return 0 if $resp->status() == _HTTP_OK;
+            return 0 if $resp->status() == _HTTP_OK;
 
-        $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
 
-        my $struct = $resp->content_struct();
+            my $struct = $resp->content_struct();
 
-        if ($struct) {
-            for my $name (newAccount_booleans()) {
-                next if !exists $struct->{$name};
-                ($struct->{$name} &&= 1) ||= 0;
+            if ($struct) {
+                for my $name (newAccount_booleans()) {
+                    next if !exists $struct->{$name};
+                    ($struct->{$name} &&= 1) ||= 0;
+                }
             }
-        }
 
-        return 1;
-    } );
+            return 1;
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -350,16 +378,18 @@ sub create_order {
 
     $self->_require_key_id(\%opts);
 
-    return $self->_post( 'newOrder', \%opts )->then( sub {
-        my ($resp) = @_;
+    return $self->_depromise(
+        $self->_post( 'newOrder', \%opts )->then( sub {
+            my ($resp) = @_;
 
-        $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
 
-        return Net::ACME2::Order->new(
-            id => $resp->header('location'),
-            %{ $resp->content_struct() },
-        );
-    } );
+            return Net::ACME2::Order->new(
+                id => $resp->header('location'),
+                %{ $resp->content_struct() },
+            );
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -376,14 +406,16 @@ The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 sub get_authorization {
     my ($self, $id) = @_;
 
-    return $self->_post_as_get($id)->then( sub {
-        my $resp = shift;
+    return $self->_depromise(
+        $self->_post_as_get($id)->then( sub {
+            my $resp = shift;
 
-        return Net::ACME2::Authorization->new(
-            id => $id,
-            %{ $resp->content_struct() },
-        );
-    } );
+            return Net::ACME2::Authorization->new(
+                id => $id,
+                %{ $resp->content_struct() },
+            );
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -421,12 +453,14 @@ Signal to the ACME server that the CHALLENGE is ready.
 sub accept_challenge {
     my ($self, $challenge_obj) = @_;
 
-    return $self->_post_url(
-        $challenge_obj->url(),
-        {
-            keyAuthorization => $self->make_key_authorization($challenge_obj),
-        },
-    )->then( sub { undef } );
+    return $self->_depromise(
+        $self->_post_url(
+            $challenge_obj->url(),
+            {
+                keyAuthorization => $self->make_key_authorization($challenge_obj),
+            },
+        )->then( sub { undef } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -470,20 +504,22 @@ sub finalize_order {
 
     $csr = MIME::Base64::encode_base64url($csr_der);
 
-    return $self->_post_url(
-        $order_obj->finalize(),
-        {
-            csr => $csr,
-        },
-    )->then( sub {
-        my $post = shift;
+    return $self->_depromise(
+        $self->_post_url(
+            $order_obj->finalize(),
+            {
+                csr => $csr,
+            },
+        )->then( sub {
+            my $post = shift;
 
-        my $content = $post->content_struct();
+            my $content = $post->content_struct();
 
-        $order_obj->update($content);
+            $order_obj->update($content);
 
-        return $order_obj->status();
-    } );
+            return $order_obj->status();
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -511,12 +547,33 @@ protocol specification for details about this format.
 sub get_certificate_chain {
     my ($self, $order) = @_;
 
-    return $self->_post_as_get( $order->certificate() )->then( sub {
-        return shift()->content();
-    } );
+    return $self->_depromise(
+        $self->_post_as_get( $order->certificate() )->then( sub {
+            return shift()->content();
+        } )
+    );
 }
 
 #----------------------------------------------------------------------
+
+sub _depromise {
+    my ($self, $promise) = @_;
+
+    return $promise if $self->{'_http_ua'};
+
+    my ($val, $die_yn, $err);
+    $promise->then(
+        sub { $val = shift },
+        sub { $die_yn = 1; $err = shift },
+    );
+
+    if ($die_yn) {
+        local $@ = $err;
+        die;
+    }
+
+    return $val;
+}
 
 sub _key_thumbprint {
     my ($self) = @_;

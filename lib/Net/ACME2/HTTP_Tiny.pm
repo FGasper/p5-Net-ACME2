@@ -23,15 +23,23 @@ Net::ACME2::HTTP_Tiny - HTTP client for Net::ACME
 
 =head1 DESCRIPTION
 
-This module largely duplicates the work of C<HTTP::Tiny::UA>, just without the
-dependency on C<superclass.pm> (which brings in a mess of other undesirables).
+This module wraps L<HTTP::Tiny>, thus:
 
-The chief benefit is that C<request()> and related methods will return
-instances of C<HTTP::Tiny::UA::Response> rather than simple hashes.
+=over
 
-This also always verifies remote SSL connections and always C<die()>s if
+=item * Make C<request()> (and, thus, C<get()>, C<post()>, etc.)
+return a (non-pending) promise.
+
+=item * Duplicate the work of C<HTTP::Tiny::UA> without the
+dependency on L<superclass> (which brings in a mess of other undesirables).
+Thus, the promises that C<request()> and related methods return
+resolve to instances of C<HTTP::Tiny::UA::Response> rather than simple hashes.
+
+=item * Verify remote SSL connections, and always C<die()> if
 either the network connection fails or the protocol indicates an error
 (4xx or 5xx).
+
+=back
 
 =cut
 
@@ -86,9 +94,10 @@ sub new {
 sub request {
     my ( $self, $method, $url, $args_hr ) = @_;
 
-    #HTTP::Tiny clobbers $@. The clobbering is useless since the
-    #error is in the $resp variable already. Clobbering also risks
-    #action-at-a-distance problems, so prevent it here.
+    # NB: HTTP::Tiny clobbers $@. The clobbering is useless since the
+    # error is in the $resp variable already. Clobbering also risks
+    # action-at-a-distance problems. It’s not a problem anymore, though,
+    # because Promise::ES6 localizes $@.
 
     return Promise::ES6->new( sub {
         my ($res) = @_;
