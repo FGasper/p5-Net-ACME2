@@ -125,6 +125,23 @@ If the above are unavailable to you, then you may be able to speed up
 your [Math::BigInt](https://metacpan.org/pod/Math::BigInt) installation; see that module’s documentation
 for more details.
 
+# SYNCHRONOUS VS. ASYNCHRONOUS MODE
+
+By default, Net::ACME2 runs synchronously, so all I/O operations block.
+
+To facilitate asynchronous operation, you now may give an `http_ua`
+to `new()`. This value must be an object that implements `request()`.
+That method should mimic [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny)’s method of the same name
+**except** that, instead of returning a hash reference, it should return
+a promise-like object that implements `then()`. That promise’s resolution
+should mimic `HTTP::Tiny::request()`’s return value.
+
+When a Net::ACME2 instance is initialized with `http_ua`, several of the
+methods described below return promises. These promises resolve to the values
+that otherwise would be returned directly in synchronous mode. Any exception
+that would be thrown in synchronous mode is given as the promise’s rejection
+value.
+
 # METHODS
 
 ## _CLASS_->new( %OPTS )
@@ -141,6 +158,8 @@ if you have it.
 directory contents. Saves a round-trip to the ACME2 server, but there’s
 no built-in logic to determine when the cache goes invalid. Caveat
 emptor.
+- `http_ua` - Optional. Provides a custom HTTP UA object. This object
+**MUST** implement the interface described in ["ASYNCHRONOUS MODE"](#asynchronous-mode).
 
 ## $id = _OBJ_->key\_id()
 

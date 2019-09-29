@@ -9,6 +9,7 @@ eval_bug.readme
 examples/dns-01.pl
 examples/http-01.pl
 examples/lib/Net_ACME2_Example.pm
+examples/lib/Net_ACME2_Example_Async.pm
 examples/tls-alpn-01.pl
 examples/tls_alpn_01_client.pl
 examples/tls_alpn_01_server.pl
