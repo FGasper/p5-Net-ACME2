@@ -9,7 +9,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 
 use parent (
-    'Net_ACME2_Example',
+    'Net_ACME2_Example_Sync',
     'Net_ACME2_Example_HTTP01',
 );
 

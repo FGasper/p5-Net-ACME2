@@ -6,13 +6,20 @@ use warnings;
 # Without __SUB__ we get memory leaks.
 use feature 'current_sub';
 
+use parent 'Net_ACME2_Example';
+
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
 use Crypt::Perl::ECDSA::Generate ();
 use Crypt::Perl::PKCS10 ();
 
-use HTTP::Tiny ();
+use lib '/Users/felipe/code/p5-Net-Curl-Promiser/lib';
+
+use AnyEvent;
+require Net::Curl::Promiser::AnyEvent;
+
+use Net::ACME2::Curl ();
 
 # Used to report failed challenges.
 use Data::Dumper;
@@ -25,16 +32,13 @@ use constant {
 };
 
 sub _finish_http_curl {
-    my ($http) = @_;
-
-    use AnyEvent;
+    my ($end_promise) = @_;
 
     my $cv = AnyEvent->condvar();
 
-    AnyEvent->idle( sub {
-        $cv->() if !$http->handles();
-    } );
+    $end_promise->finally($cv);
 
+    $cv->recv();
 }
 
 sub run {
@@ -43,10 +47,6 @@ sub run {
     local $Promise::ES6::DETECT_MEMORY_LEAKS = 1;
 
     my $_test_key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
-
-use lib '/Users/felipe/code/p5-Net-Curl-Promiser/lib';
-require Net::Curl::Promiser::AnyEvent;
-require Net::ACME2::Curl;
 
     my $promiser = Net::Curl::Promiser::AnyEvent->new();
 
@@ -70,14 +70,13 @@ require Net::ACME2::Curl;
             print "$/Indicate acceptance of the terms of service at:$/$/";
             print "\t" . $tos . $/ . $/;
             print "… by hitting ENTER now.$/";
+
+            # This isn’t very “async”, but oh well. :)
             <>;
 
             my $acct_promise = $acme->create_account(
                 termsOfServiceAgreed => 1,
             );
-
-use Data::Dumper;
-#print STDERR Dumper(acct_promise => $acct_promise);
 
             return $acct_promise;
         } );
@@ -87,8 +86,7 @@ use Data::Dumper;
 
     my (@domains, $order, $key, $csr);
 
-    $key_id_promise->then( sub {
-print "order done\n";
+    my $end_promise = $key_id_promise->then( sub {
         @domains = $class->_get_domains();
 
         return $acme->create_order(
@@ -158,7 +156,7 @@ print "order done\n";
 
         return undef;
     } )->then( sub {
-        ($key, $csr) = _make_key_and_csr_for_domains(@domains);
+        ($key, $csr) = $class->_make_key_and_csr_for_domains(@domains);
 
         print "Finalizing order …$/";
 
@@ -184,80 +182,9 @@ print "order done\n";
         print STDERR "FAILURE: " . ( eval { $msg->get_message() } // $msg ) . $/;
     } );
 
-    _finish_http_curl($promiser);
+    _finish_http_curl($end_promise);
 
     return;
-}
-
-sub _get_challenge_from_authz {
-    my ($class, $authz_obj) = @_;
-
-    my $challenge_type = $class->_CHALLENGE_TYPE();
-
-    my ($challenge) = grep { $_->type() eq $challenge_type } $authz_obj->challenges();
-
-    if (!$challenge) {
-        die "No “$challenge_type” challenge for “$authz_obj”!\n";
-    }
-
-    return $challenge;
-}
-
-sub _get_domains {
-    my ($self) = @_;
-
-    print $/;
-
-    my @domains;
-    while (1) {
-        print "Enter a domain for the certificate (or ENTER if you’re done): ";
-        my $d = <STDIN>;
-        chomp $d;
-
-        if (!defined $d || !length $d) {
-            last if @domains;
-
-            warn "Give at least one domain.$/";
-        }
-        else {
-            if ($d =~ tr<*><> && !$self->CAN_WILDCARD) {
-                warn "This authorization type can’t do wildcard!\n";
-            }
-            else {
-                push( @domains, $d );
-            }
-        }
-    }
-
-    return @domains;
-}
-
-sub _make_key_and_csr_for_domains {
-    my (@domains) = @_;
-
-    Call::Context::must_be_list();
-
-    #ECDSA is used here because it’s quick enough to run in pure Perl.
-    #If you need/want RSA, look at Crypt::OpenSSL::RSA, and/or
-    #install Math::BigInt::GMP (or M::BI::Pari) and use
-    #Crypt::Perl::RSA::Generate. Or just do qx<openssl genrsa>. :)
-    my $key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE());
-
-    my $pkcs10 = Crypt::Perl::PKCS10->new(
-        key => $key,
-
-        subject => [
-            commonName => $domains[0],
-        ],
-
-        attributes => [
-            [ 'extensionRequest',
-                [ 'subjectAltName', map { ( dNSName => $_ ) } @domains ],
-            ],
-        ],
-    );
-
-    return ( $key->to_pem_with_curve_name(), $pkcs10->to_pem() );
 }
 
 1;

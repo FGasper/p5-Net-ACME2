@@ -628,15 +628,17 @@ sub _require_key_id {
 sub _poll_order_or_authz {
     my ($self, $order_or_authz_obj) = @_;
 
-    return $self->_post_as_get( $order_or_authz_obj->id() )->then( sub {
-        my $get = shift;
+    return $self->_depromise(
+        $self->_post_as_get( $order_or_authz_obj->id() )->then( sub {
+            my $get = shift;
 
-        my $content = $get->content_struct();
+            my $content = $get->content_struct();
 
-        $order_or_authz_obj->update($content);
+            $order_or_authz_obj->update($content);
 
-        return $order_or_authz_obj->status();
-    } );
+            return $order_or_authz_obj->status();
+        } ),
+    );
 }
 
 sub _key_obj {

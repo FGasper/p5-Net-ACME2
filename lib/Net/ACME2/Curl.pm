@@ -36,7 +36,7 @@ sub request {
 
     $easy->setopt( Net::Curl::Easy::CURLOPT_HEADERDATA(), \$easy->{'_head'} );
     $easy->setopt( Net::Curl::Easy::CURLOPT_FILE(), \$easy->{'_body'} );
-syswrite \*STDERR, "loch 2\n";
+
     my $p1 = $self->{'_promiser'}->add_handle($easy)->then(
         sub {
             my ($easy) = @_;
@@ -117,7 +117,7 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
 
     my $easy = Net::Curl::Easy->new();
 
-    $easy->setopt( Net::Curl::Easy::CURLOPT_VERBOSE(), 1 );
+    # $easy->setopt( Net::Curl::Easy::CURLOPT_VERBOSE(), 1 );
 
     $easy->setopt( Net::Curl::Easy::CURLOPT_URL(), $url );
 
@@ -127,10 +127,10 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
         $easy->setopt( Net::Curl::Easy::CURLOPT_POST(), 1 );
 
         if (defined $args_hr->{'content'} && length $args_hr->{'content'}) {
-#            $easy->setopt(
-#                Net::Curl::Easy::CURLOPT_POSTFIELDSIZE(),
-#                length $args_hr->{'content'},
-#            );
+            $easy->setopt(
+                Net::Curl::Easy::CURLOPT_POSTFIELDSIZE(),
+                length $args_hr->{'content'},
+            );
             $easy->setopt(
                 Net::Curl::Easy::CURLOPT_COPYPOSTFIELDS(),
                 $args_hr->{'content'},
@@ -145,7 +145,6 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
     elsif ($method ne 'GET') {
         die "Bad HTTP method: [$method]";
     }
-syswrite \*STDERR, "loch 1\n";
 
     return $easy;
 }
@@ -159,7 +158,7 @@ sub _assign_headers {
         for my $name (keys %$hdrs_hr) {
             my $value = $hdrs_hr->{$name};
 
-            if ( (ref($value) || q<>)->isa('ARRAY') ) {
+            if ( (ref($value) || q<a>)->isa('ARRAY') ) {
                 push @hdr_strs, "$name: $_" for @$value;
             }
             elsif (ref $value) {
