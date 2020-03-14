@@ -26,6 +26,7 @@ lib/Net/ACME2/Challenge/dns_01.pm
 lib/Net/ACME2/Challenge/http_01.pm
 lib/Net/ACME2/Challenge/http_01/Handler.pm
 lib/Net/ACME2/Challenge/tls_alpn_01.pm
+lib/Net/ACME2/Constants.pm
 lib/Net/ACME2/Curl.pm
 lib/Net/ACME2/Error.pm
 lib/Net/ACME2/HTTP.pm

@@ -129,18 +129,24 @@ for more details.
 
 By default, Net::ACME2 runs synchronously, so all I/O operations block.
 
-To facilitate asynchronous operation, you now may give an `http_ua`
+To facilitate asynchronous operation, you may give an `http_ua`
 to `new()`. This value must be an object that implements `request()`.
 That method should mimic [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny)’s method of the same name
 **except** that, instead of returning a hash reference, it should return
-a promise-like object that implements `then()`. That promise’s resolution
-should mimic `HTTP::Tiny::request()`’s return value.
+a promise. (à la [Promise::XS](https://metacpan.org/pod/Promise::XS), [Promise::ES6](https://metacpan.org/pod/Promise::ES6), [Mojo::Promise](https://metacpan.org/pod/Mojo::Promise), etc.)
+That promise’s resolution should mimic `HTTP::Tiny::request()`’s return value.
 
-When a Net::ACME2 instance is initialized with `http_ua`, several of the
+When a Net::ACME2 instance is created with `http_ua`, several of the
 methods described below return promises. These promises resolve to the values
 that otherwise would be returned directly in synchronous mode. Any exception
 that would be thrown in synchronous mode is given as the promise’s rejection
-value.
+value. This document’s convention to indicate a function that, in
+asynchronous mode, returns a promise is:
+
+    promise($whatever) = ...
+
+This distribution ships with [Net::ACME2::Curl](https://metacpan.org/pod/Net::ACME2::Curl), a wrapper around
+[Net::Curl::Promiser](https://metacpan.org/pod/Net::Curl::Promiser) that 
 
 # METHODS
 
@@ -170,6 +176,8 @@ or as fetched in `create_account()`.
 
 A passthrough interface to the underlying [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny) object’s
 `timeout()` method.
+
+Throws an exception if `http_ua` was given to `new()`.
 
 ## promise($url) = _CLASS_->get\_terms\_of\_service()
 
