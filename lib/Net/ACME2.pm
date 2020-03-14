@@ -3,6 +3,8 @@ package Net::ACME2;
 use strict;
 use warnings;
 
+# See Net::ACME2::Constants for $VERSION.
+
 =encoding utf-8
 
 =head1 NAME
@@ -151,18 +153,24 @@ for more details.
 
 By default, Net::ACME2 runs synchronously, so all I/O operations block.
 
-To facilitate asynchronous operation, you now may give an C<http_ua>
+To facilitate asynchronous operation, you may give an C<http_ua>
 to C<new()>. This value must be an object that implements C<request()>.
 That method should mimic L<HTTP::Tiny>’s method of the same name
 B<except> that, instead of returning a hash reference, it should return
-a promise-like object that implements C<then()>. That promise’s resolution
-should mimic C<HTTP::Tiny::request()>’s return value.
+a promise. (à la L<Promise::XS>, L<Promise::ES6>, L<Mojo::Promise>, etc.)
+That promise’s resolution should mimic C<HTTP::Tiny::request()>’s return value.
 
-When a Net::ACME2 instance is initialized with C<http_ua>, several of the
+When a Net::ACME2 instance is created with C<http_ua>, several of the
 methods described below return promises. These promises resolve to the values
 that otherwise would be returned directly in synchronous mode. Any exception
 that would be thrown in synchronous mode is given as the promise’s rejection
-value.
+value. This document’s convention to indicate a function that, in
+asynchronous mode, returns a promise is:
+
+    promise($whatever) = ...
+
+This distribution ships with L<Net::ACME2::Curl>, a wrapper around
+L<Net::Curl::Promiser> that 
 
 =cut
 
@@ -176,8 +184,6 @@ use Net::ACME2::AccountKey;
 use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
-
-our $VERSION = '0.33';
 
 use constant {
     _HTTP_OK => 200,
@@ -273,10 +279,14 @@ sub key_id {
 A passthrough interface to the underlying L<HTTP::Tiny> object’s
 C<timeout()> method.
 
+Throws an exception if C<http_ua> was given to C<new()>.
+
 =cut
 
 sub http_timeout {
     my $self = shift;
+
+    die 'Don’t call in asynchronous mode!' if $self->{'_http_ua'};
 
     return $self->{'_http'}->timeout(@_);
 }

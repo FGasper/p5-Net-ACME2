@@ -6,12 +6,10 @@ use warnings;
 use Promise::ES6 ();
 
 use Net::Curl::Easy ();
-use Net::Curl::Multi ();
 
 use Net::ACME2::HTTP::Convert ();
 
-# blegh
-use Net::ACME2 ();
+use Net::ACME2::Constants ();
 
 sub new {
     my ($class, $promiser) = @_;
@@ -22,7 +20,7 @@ sub new {
 sub _get_ua_string {
     my ($self) = @_;
 
-    return ref($self) . " $Net::ACME2::VERSION";
+    return ref($self) . " $Net::ACME2::Constants::VERSION";
 }
 
 sub request {
@@ -143,7 +141,7 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
         $easy->setopt( Net::Curl::Easy::CURLOPT_NOBODY(), 1 );
     }
     elsif ($method ne 'GET') {
-        die "Bad HTTP method: [$method]";
+        $easy->setopt( Net::Curl::Easy::CURLOPT_CUSTOMREQUEST(), $method );
     }
 
     return $easy;

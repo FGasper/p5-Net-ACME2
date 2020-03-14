@@ -5,11 +5,11 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     NAME         => 'Net::ACME2',
-    VERSION_FROM => 'lib/Net/ACME2.pm',            # finds \$VERSION
+    VERSION_FROM => 'lib/Net/ACME2/Constants.pm',
     AUTHOR       => 'Felipe Gasper',
     ABSTRACT_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
-    MIN_PERL_VERSION => '5.8.9',
+    MIN_PERL_VERSION => '5.10.0',
     PREREQ_PM    => {
         'autodie'                  => 0,
         'constant'                 => 1.23,
