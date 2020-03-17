@@ -170,7 +170,7 @@ asynchronous mode, returns a promise is:
     promise($whatever) = ...
 
 This distribution ships with L<Net::ACME2::Curl>, a wrapper around
-L<Net::Curl::Promiser> that 
+L<Net::Curl::Promiser>, which in turns wraps L<Net::Curl::Multi>.
 
 =cut
 

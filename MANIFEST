@@ -9,6 +9,7 @@ eval_bug.readme
 examples/dns-01.pl
 examples/dns-01_async.pl
 examples/http-01.pl
+examples/http-01_async.pl
 examples/lib/Net_ACME2_Example.pm
 examples/lib/Net_ACME2_Example_Async.pm
 examples/lib/Net_ACME2_Example_DNS01.pm

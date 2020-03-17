@@ -146,7 +146,7 @@ asynchronous mode, returns a promise is:
     promise($whatever) = ...
 
 This distribution ships with [Net::ACME2::Curl](https://metacpan.org/pod/Net::ACME2::Curl), a wrapper around
-[Net::Curl::Promiser](https://metacpan.org/pod/Net::Curl::Promiser) that 
+[Net::Curl::Promiser](https://metacpan.org/pod/Net::Curl::Promiser), which in turns wraps [Net::Curl::Multi](https://metacpan.org/pod/Net::Curl::Multi).
 
 # METHODS
 
