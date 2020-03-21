@@ -9,8 +9,8 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 
 use parent (
-    'Net_ACME2_Example_Sync',
     'Net_ACME2_Example_DNS01',
+    'Net_ACME2_Example_Sync',
 );
 
 __PACKAGE__->run() if !caller;

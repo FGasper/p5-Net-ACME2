@@ -59,7 +59,7 @@ sub _make_key_and_csr_for_domains {
     #If you need/want RSA, look at Crypt::OpenSSL::RSA, and/or
     #install Math::BigInt::GMP (or M::BI::Pari) and use
     #Crypt::Perl::RSA::Generate. Or just do qx<openssl genrsa>. :)
-    my $key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE());
+    my $key = Crypt::Perl::ECDSA::Generate::by_name($class->_ECDSA_CURVE());
 
     my $pkcs10 = Crypt::Perl::PKCS10->new(
         key => $key,

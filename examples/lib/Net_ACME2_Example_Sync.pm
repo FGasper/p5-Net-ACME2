@@ -6,6 +6,8 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
+use parent 'Net_ACME2_Example';
+
 use Crypt::Perl::ECDSA::Generate ();
 use Crypt::Perl::PKCS10 ();
 
@@ -117,34 +119,6 @@ sub run {
     print $acme->get_certificate_chain($order);
 
     return;
-}
-
-sub _make_key_and_csr_for_domains {
-    my (@domains) = @_;
-
-    Call::Context::must_be_list();
-
-    #ECDSA is used here because it’s quick enough to run in pure Perl.
-    #If you need/want RSA, look at Crypt::OpenSSL::RSA, and/or
-    #install Math::BigInt::GMP (or M::BI::Pari) and use
-    #Crypt::Perl::RSA::Generate. Or just do qx<openssl genrsa>. :)
-    my $key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE());
-
-    my $pkcs10 = Crypt::Perl::PKCS10->new(
-        key => $key,
-
-        subject => [
-            commonName => $domains[0],
-        ],
-
-        attributes => [
-            [ 'extensionRequest',
-                [ 'subjectAltName', map { ( dNSName => $_ ) } @domains ],
-            ],
-        ],
-    );
-
-    return ( $key->to_pem_with_curve_name(), $pkcs10->to_pem() );
 }
 
 1;
