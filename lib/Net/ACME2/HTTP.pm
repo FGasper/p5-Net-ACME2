@@ -21,7 +21,6 @@ use warnings;
 use JSON ();
 
 use Net::ACME2::Error          ();
-use Net::ACME2::HTTP_Tiny      ();
 use Net::ACME2::HTTP::Response ();
 use Net::ACME2::X              ();
 

@@ -3,7 +3,8 @@ package Net::ACME2;
 use strict;
 use warnings;
 
-# See Net::ACME2::Constants for $VERSION.
+our $VERSION;
+BEGIN { $VERSION = '0.34' }
 
 =encoding utf-8
 
@@ -106,6 +107,8 @@ a new version of this module.
 
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
+=item * Supports blocking and (experimentall) non-blocking I/O.
+
 =item * L<Retry POST on C<badNonce> errors.|https://tools.ietf.org/html/rfc8555#section-6.5>
 
 =item * This is a pure-Perl solution. Most of its dependencies are
@@ -149,18 +152,19 @@ for more details.
 
 =cut
 
-=head1 SYNCHRONOUS VS. ASYNCHRONOUS MODE
+=head1 EXPERIMENTAL: NON-BLOCKING (ASYNCHRONOUS) I/O
 
-By default, Net::ACME2 runs synchronously, so all I/O operations block.
+By default, Net::ACME2 uses blocking I/O.
 
-To facilitate asynchronous operation, you may give an C<http_ua>
+To facilitate asynchronous/non-blocking I/O, you may give an C<async_ua>
 to C<new()>. This value must be an object that implements C<request()>.
 That method should mimic L<HTTP::Tiny>’s method of the same name
 B<except> that, instead of returning a hash reference, it should return
 a promise. (à la L<Promise::XS>, L<Promise::ES6>, L<Mojo::Promise>, etc.)
-That promise’s resolution should mimic C<HTTP::Tiny::request()>’s return value.
+That promise’s resolution should be a single value that mimics
+C<HTTP::Tiny::request()>’s return structure.
 
-When a Net::ACME2 instance is created with C<http_ua>, several of the
+When a Net::ACME2 instance is created with C<async_ua>, several of the
 methods described below return promises. These promises resolve to the values
 that otherwise would be returned directly in synchronous mode. Any exception
 that would be thrown in synchronous mode is given as the promise’s rejection
@@ -170,7 +174,9 @@ asynchronous mode, returns a promise is:
     promise($whatever) = ...
 
 This distribution ships with L<Net::ACME2::Curl>, a wrapper around
-L<Net::Curl::Promiser>, which in turns wraps L<Net::Curl::Multi>.
+L<Net::Curl::Promiser>, which in turns wraps L<Net::Curl::Multi>. This
+provides out-of-the-box support for Perl’s most widely-used event interfaces;
+see Net::Curl::Promiser’s documentation for more details.
 
 =cut
 
@@ -184,8 +190,6 @@ use Net::ACME2::AccountKey;
 use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
-
-our $VERSION = '0.34';
 
 use constant {
     _HTTP_OK => 200,
@@ -204,6 +208,8 @@ use constant FULL_JWT_METHODS => qw(
     newAccount
     revokeCert
 );
+
+#----------------------------------------------------------------------
 
 =head1 METHODS
 
@@ -226,8 +232,8 @@ directory contents. Saves a round-trip to the ACME2 server, but there’s
 no built-in logic to determine when the cache goes invalid. Caveat
 emptor.
 
-=item * C<http_ua> - Optional. Provides a custom HTTP UA object. This object
-B<MUST> implement the interface described in L</ASYNCHRONOUS MODE>.
+=item * C<async_ua> - Optional. Provides a custom UA object to facilitate
+non-blocking I/O. This object B<MUST> implement the interface described above.
 
 =back
 
@@ -249,7 +255,7 @@ sub _new_without_key_check {
         _key  => $opts{'key'},
         _key_id => $opts{'key_id'},
         _directory => $opts{'directory'},
-        _http_ua => $opts{'http_ua'},
+        _http_ua => $opts{'async_ua'},
     };
 
     bless $self, $class;
@@ -281,7 +287,7 @@ sub key_id {
 A passthrough interface to the underlying L<HTTP::Tiny> object’s
 C<timeout()> method.
 
-Throws an exception if C<http_ua> was given to C<new()>.
+Throws an exception if C<async_ua> was given to C<new()>.
 
 =cut
 
@@ -310,7 +316,7 @@ sub get_terms_of_service {
         $self = $self->_new_without_key_check();
     }
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_get_directory()->then( sub {
             my $dir = shift;
 
@@ -347,7 +353,7 @@ sub create_account {
         ($opts{$name} &&= JSON::true()) ||= JSON::false();
     }
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post( 'newAccount', \%opts )->then( sub {
             my ($resp) = @_;
 
@@ -390,18 +396,19 @@ sub create_order {
 
     $self->_require_key_id(\%opts);
 
-    return $self->_depromise(
-        $self->_post( 'newOrder', \%opts )->then( sub {
-            my ($resp) = @_;
-
-            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
-
-            return Net::ACME2::Order->new(
-                id => $resp->header('location'),
-                %{ $resp->content_struct() },
-            );
-        } ),
-    );
+return $self->_post( 'newOrder', \%opts )
+#    return $self->_depromise_if_sync(
+#        $self->_post( 'newOrder', \%opts )->then( sub {
+#            my ($resp) = @_;
+#
+#            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+#
+#            return Net::ACME2::Order->new(
+#                id => $resp->header('location'),
+#                %{ $resp->content_struct() },
+#            );
+#        } ),
+#    );
 }
 
 #----------------------------------------------------------------------
@@ -418,7 +425,7 @@ The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 sub get_authorization {
     my ($self, $id) = @_;
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post_as_get($id)->then( sub {
             my $resp = shift;
 
@@ -465,7 +472,7 @@ Signal to the ACME server that the CHALLENGE is ready.
 sub accept_challenge {
     my ($self, $challenge_obj) = @_;
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post_url(
             $challenge_obj->url(),
             {
@@ -516,7 +523,7 @@ sub finalize_order {
 
     $csr = MIME::Base64::encode_base64url($csr_der);
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post_url(
             $order_obj->finalize(),
             {
@@ -559,7 +566,7 @@ protocol specification for details about this format.
 sub get_certificate_chain {
     my ($self, $order) = @_;
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post_as_get( $order->certificate() )->then( sub {
             return shift()->content();
         } )
@@ -568,7 +575,7 @@ sub get_certificate_chain {
 
 #----------------------------------------------------------------------
 
-sub _depromise {
+sub _depromise_if_sync {
     my ($self, $promise) = @_;
 
     return $promise if $self->{'_http_ua'};
@@ -640,7 +647,7 @@ sub _require_key_id {
 sub _poll_order_or_authz {
     my ($self, $order_or_authz_obj) = @_;
 
-    return $self->_depromise(
+    return $self->_depromise_if_sync(
         $self->_post_as_get( $order_or_authz_obj->id() )->then( sub {
             my $get = shift;
 

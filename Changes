@@ -1,7 +1,7 @@
 Revision history for Perl module Net::ACME2
 
 0.40
-- Provide a mechanism for asynchronous HTTP.
+- Provide an EXPERIMENTAL mechanism for asynchronous HTTP.
 
 0.34 13 March 2020
 - Fix warning in error objects if there is no “status”.

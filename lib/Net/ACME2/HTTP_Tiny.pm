@@ -59,14 +59,13 @@ use Net::ACME2::HTTP::Convert ();
 # $Net::ACME2::VERSION. (Thanks to Dan Book for pointing it out.)
 use Net::ACME2 ();
 
-sub VERSION {
+our $VERSION;
+BEGIN {
 
     # HTTP::Tiny gets upset if there’s anything non-numeric
     # (e.g., “-TRIAL1”) in VERSION(). So weed it out here.
-    my $version = $Net::ACME2::VERSION;
-    $version =~ s<[^0-9].].*><>;
-
-    return $version;
+    $VERSION = $Net::ACME2::VERSION;
+    $VERSION =~ s<[^0-9.].*><>;
 }
 
 #Use this to tweak SSL config, e.g., if you want to cache PublicSuffix.

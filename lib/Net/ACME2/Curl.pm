@@ -3,13 +3,60 @@ package Net::ACME2::Curl;
 use strict;
 use warnings;
 
-use Promise::ES6 ();
+=encoding utf-8
+
+=head1 NAME
+
+Net::ACME2::Curl
+
+=head1 SYNOPSIS
+
+To integrate with, e.g., L<Mojolicious>:
+
+    my $promiser = Net::Curl::Promiser::Mojo->new();
+
+    my $acme2_ua = Net::ACME2::Curl->new($promiser);
+
+    my $acme = SomeNetACME2Subclass->new(
+        async_ua => $acme2_ua,
+        ...,
+    );
+
+    my $tos_p = $acme->get_terms_of_service()->then(
+        sub { my $url = shift; ... },
+    );
+
+… and so on.
+
+=head1 DESCRIPTION
+
+This class implements non-blocking I/O in L<Net::ACME2> via
+L<Net::Curl::Promiser>. By using this module you can integrate Net::ACME2
+into most popular Perl event loops.
+
+=head1 STATUS
+
+This module is currently B<EXPERIMENTAL>. Caveat emptor.
+
+=cut
+
+#----------------------------------------------------------------------
 
 use Net::Curl::Easy ();
 
+use Net::ACME2 ();
 use Net::ACME2::HTTP::Convert ();
 
-use Net::ACME2::Constants ();
+#----------------------------------------------------------------------
+
+=head1 METHODS
+
+=head2 $obj = I<CLASS>->new( $PROMISER )
+
+Instantiates this class. Receives an instance of an appropriate
+L<Net::Curl::Promiser> subclass for the environment.
+
+=cut
 
 sub new {
     my ($class, $promiser) = @_;
@@ -17,18 +64,35 @@ sub new {
     return bless { _promiser => $promiser }, $class;
 }
 
+=head2 $obj = I<OBJ>->set_easy_callback( $CODEREF )
+
+Installs a callback ($CODEREF) that I<OBJ> will call after creating
+a L<Net::Curl::Easy> instance. That instance is given as an argument to
+the callback. Via this method you can customize each HTTP request, e.g.,
+to set timeouts, DNS resolution settings, a custom User-Agent string,
+and the like.
+
+=cut
+
+sub set_easy_callback {
+    my ($self, $cb) = @_;
+
+    $self->{'_easy_cb'} = $cb;
+
+    return $self;
+}
+
 sub _get_ua_string {
     my ($self) = @_;
 
-    return ref($self) . " $Net::ACME2::Constants::VERSION";
+    return ref($self) . " $Net::ACME2::VERSION";
 }
 
+# Not documented because it’s part of the required interface.
 sub request {
     my ($self, $method, $url, $args_hr) = @_;
 
-    my $easy = _xlate_http_tiny_request_to_net_curl_easy($method, $url, $args_hr);
-
-    $easy->setopt( Net::Curl::Easy::CURLOPT_USERAGENT(), $self->_get_ua_string() );
+    my $easy = $self->_xlate_http_tiny_request_to_net_curl_easy($method, $url, $args_hr);
 
     $_ = q<> for @{$easy}{ qw( _head _body ) };
 
@@ -111,9 +175,14 @@ sub _imitate_http_tiny {
 
 # HTTP::Tiny request -> curl request
 sub _xlate_http_tiny_request_to_net_curl_easy {
-    my ($method, $url, $args_hr) = @_;
+    my ($self, $method, $url, $args_hr) = @_;
 
     my $easy = Net::Curl::Easy->new();
+
+    # By setting this here we allow the callback to overwrite it.
+    $easy->setopt( Net::Curl::Easy::CURLOPT_USERAGENT(), $self->_get_ua_string() );
+
+    $self->{'_easy_cb'}->($easy) if $self->{'_easy_cb'};
 
     # $easy->setopt( Net::Curl::Easy::CURLOPT_VERBOSE(), 1 );
 
