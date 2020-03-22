@@ -107,7 +107,7 @@ a new version of this module.
 
 =item * Comprehensive error handling with typed, L<X::Tiny>-based exceptions.
 
-=item * Supports blocking and (experimentall) non-blocking I/O.
+=item * Supports blocking and (experimentally) non-blocking I/O.
 
 =item * L<Retry POST on C<badNonce> errors.|https://tools.ietf.org/html/rfc8555#section-6.5>
 
@@ -607,7 +607,7 @@ sub _get_directory {
 
         my $http = $self->{'_http'};
 
-        my $p = $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
+        $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
             my $dir_hr = shift()->content_struct();
 
             my $new_nonce_url = $dir_hr->{'newNonce'} or do {

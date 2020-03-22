@@ -197,35 +197,6 @@ sub _request {
         sub {
             return Net::ACME2::HTTP::Response->new($_[0]);
         },
-#        sub {
-#            my $exc = shift;
-#
-#            if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
-#
-#                $self->_consume_nonce_in_headers( $exc->get('headers') );
-#
-#                #If the exception is able to be made into a Net::ACME2::Error,
-#                #then do so to get a nicer error message.
-#                my $acme_error = eval {
-#                    Net::ACME2::Error->new(
-#                        %{ JSON::decode_json( $exc->get('content') ) },
-#                    );
-#                };
-#
-#                if ($acme_error) {
-#                    die Net::ACME2::X->create(
-#                        'ACME',
-#                        {
-#                            http => $exc,
-#                            acme => $acme_error,
-#                        },
-#                    );
-#                }
-#            }
-#
-#            $@ = $exc;
-#            die;
-#        },
     );
 }
 
