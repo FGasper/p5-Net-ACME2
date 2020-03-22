@@ -14,9 +14,9 @@ use lib "$FindBin::Bin/../lib";
 use Crypt::Perl::ECDSA::Generate ();
 use Crypt::Perl::PKCS10 ();
 
-use AnyEvent::Loop;
-use AnyEvent;
-require Net::Curl::Promiser::AnyEvent;
+use constant _PROMISE_CLASS => 'Net::Curl::Promiser::AnyEvent';
+
+die if !eval( 'require ' . _PROMISE_CLASS() );
 
 use Net::ACME2::Curl ();
 
@@ -30,15 +30,25 @@ use constant {
     CAN_WILDCARD => 0,
 };
 
+# Fill these in to reuse an existing registration.
+my $_CACHED_TEST_KEY_PEM = undef;
+my $_CACHED_KEY_ID = undef;
+
 sub _finish_http_curl {
     my ($end_promise) = @_;
 
-    my $cv = AnyEvent->condvar();
+    if ($end_promise->isa('Mojo::Promise')) {
+        $end_promise->wait();
+    }
+    else {
+        my $cv = AnyEvent->condvar();
 
-    my $finally = $end_promise->finally( sub { $cv->() } );
-print "finally: $finally\n";
+        my $finally = $end_promise->finally( sub { $cv->() } );
 
-    $cv->recv();
+        $cv->recv();
+    }
+
+    return;
 }
 
 sub run {
@@ -46,22 +56,27 @@ sub run {
 
     local $Promise::ES6::DETECT_MEMORY_LEAKS = 1;
 
-    my $_test_key = Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
+    my $_test_key = $_CACHED_TEST_KEY_PEM || Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
 
-    my $promiser = Net::Curl::Promiser::AnyEvent->new();
+    my $promiser = _PROMISE_CLASS()->new();
 
     my $acme = Net::ACME2::LetsEncrypt->new(
         environment => 'staging',
         async_ua => Net::ACME2::Curl->new($promiser),
         key => $_test_key,
+        key_id => $_CACHED_KEY_ID,
     );
 
-    my $key_id_promise;
+    my ($key_id_promise, $key_id_is_cached);
 
     #conditional is for if you want to modify this example to use
     #a pre-existing account.
     if ($acme->key_id()) {
-        die "not for example";
+        $key_id_is_cached = 1;
+        print "Using hard-coded ACME key ID …$/";
+
+        require Promise::ES6;
+        $key_id_promise = Promise::ES6->resolve($acme->key_id());
     }
     else {
         $key_id_promise = $acme->get_terms_of_service()->then( sub {
@@ -76,7 +91,11 @@ sub run {
 
             my $acct_promise = $acme->create_account(
                 termsOfServiceAgreed => 1,
-            );
+            )->then( sub {
+                printf "Created ACME registration!$/";
+                printf "ACME Key ID: %s$/$/", $acme->key_id();
+                printf "Key:$/%s$/", $_test_key;
+            } );
 
             return $acct_promise;
         } );
@@ -86,107 +105,104 @@ sub run {
 
     my (@domains, $order, $key, $csr);
 
-print "key ID promise: $key_id_promise\n";
     my $end_promise = $key_id_promise->then( sub {
         @domains = $class->_get_domains();
+        print "Creating order …\n";
 
         return $acme->create_order(
             identifiers => [ map { { type => 'dns', value => $_ } } @domains ],
         );
-#    } )->then( sub {
-#        $order = shift;
-#
-#        return Promise::ES6->all(
-#            [ map { $acme->get_authorization($_) } $order->authorizations() ],
-#        );
-#    } )->then( sub {
-#        $authzs_ar = shift;
-#
-#        my $valid_authz_count = 0;
-#
-#        for my $authz_obj (@$authzs_ar) {
-#            my $domain = $authz_obj->identifier()->{'value'};
-#
-#            if ($authz_obj->status() eq 'valid') {
-#                $valid_authz_count++;
-#                print "$/This account is already authorized on $domain.$/";
-#                next;
-#            }
-#
-#            my $challenge = $class->_authz_handler($acme, $authz_obj);
-#
-#            return $acme->accept_challenge($challenge);
-#        }
-#    } )->then( sub {
-#        my @promises;
-#
-#        for my $authz (@$authzs_ar) {
-#            next if $authz->status() eq 'valid';
-#
-#            push @promises, $acme->poll_authorization($authz)->then( sub {
-#                my $status = shift;
-#
-#                my $name = $authz->identifier()->{'value'};
-#                substr($name, 0, 0, '*.') if $authz->wildcard();
-#
-#                if ($status eq 'valid') {
-#
-#                    print "$/“$name” has passed validation.$/";
-#                }
-#                elsif ($status eq 'pending') {
-#                    print "$/“$name”’s authorization is still pending …$/";
-#                }
-#                else {
-#                    if ($status eq 'invalid') {
-#                        my $challenge = $class->_get_challenge_from_authz($authz);
-#                        print Dumper($challenge);
-#                    }
-#
-#                    die "$/“$name”’s authorization is in “$status” state.";
-#                }
-#            } );
-#        }
-#
-#        if (@promises) {
-#            print "Waiting 1 second before polling authzs again …$/";
-#
-#            sleep 1;
-#
-#            return Promise::ES6->all(\@promises)->then(__SUB__);
-#        }
-#
-#        return undef;
-#    } )->then( sub {
-#        ($key, $csr) = $class->_make_key_and_csr_for_domains(@domains);
-#
-#        print "Finalizing order …$/";
-#
-#        return $acme->finalize_order($order, $csr)->then( sub {
-#            if ($order->status() ne 'valid') {
-#                print "Waiting 1 second before polling order again …$/";
-#
-#                sleep 1;
-#
-#                return $acme->poll_order($order)->then(__SUB__);
-#            }
-#        } );
-#    } )->then( sub {
-#        return $acme->get_certificate_chain($order);
-#    } )->then( sub {
-#        print "Certificate key:$/$key$/$/";
-#
-#        print "Certificate chain:$/";
-#
-#        print shift;
-#    } )->catch( sub {
-#        my $msg = shift;
-#        print STDERR "FAILURE: " . ( eval { $msg->get_message() } // $msg ) . $/;
+    } )->then( sub {
+        $order = shift;
+
+        return Promise::ES6->all(
+            [ map { $acme->get_authorization($_) } $order->authorizations() ],
+        );
+    } )->then( sub {
+        $authzs_ar = shift;
+
+        my $valid_authz_count = 0;
+
+        for my $authz_obj (@$authzs_ar) {
+            my $domain = $authz_obj->identifier()->{'value'};
+
+            if ($authz_obj->status() eq 'valid') {
+                $valid_authz_count++;
+                print "$/This account is already authorized on $domain.$/";
+                next;
+            }
+
+            my $challenge = $class->_authz_handler($acme, $authz_obj);
+
+            return $acme->accept_challenge($challenge);
+        }
+    } )->then( sub {
+        my @promises;
+
+        for my $authz (@$authzs_ar) {
+            next if $authz->status() eq 'valid';
+
+            push @promises, $acme->poll_authorization($authz)->then( sub {
+                my $status = shift;
+
+                my $name = $authz->identifier()->{'value'};
+                substr($name, 0, 0, '*.') if $authz->wildcard();
+
+                if ($status eq 'valid') {
+
+                    print "$/“$name” has passed validation.$/";
+                }
+                elsif ($status eq 'pending') {
+                    print "$/“$name”’s authorization is still pending …$/";
+                }
+                else {
+                    if ($status eq 'invalid') {
+                        my $challenge = $class->_get_challenge_from_authz($authz);
+                        print Dumper($challenge);
+                    }
+
+                    die "$/“$name”’s authorization is in “$status” state.";
+                }
+            } );
+        }
+
+        if (@promises) {
+            print "Waiting 1 second before polling authzs again …$/";
+
+            sleep 1;
+
+            return Promise::ES6->all(\@promises)->then(__SUB__);
+        }
+
+        return undef;
+    } )->then( sub {
+        ($key, $csr) = $class->_make_key_and_csr_for_domains(@domains);
+
+        print "Finalizing order …$/";
+
+        return $acme->finalize_order($order, $csr)->then( sub {
+            if ($order->status() ne 'valid') {
+                print "Waiting 1 second before polling order again …$/";
+
+                sleep 1;
+
+                return $acme->poll_order($order)->then(__SUB__);
+            }
+        } );
+    } )->then( sub {
+        return $acme->get_certificate_chain($order);
+    } )->then( sub {
+        print "Certificate key:$/$key$/$/";
+
+        print "Certificate chain:$/";
+
+        print shift;
+    } )->catch( sub {
+        my $msg = shift;
+        print STDERR "FAILURE: " . ( eval { $msg->get_message() } // $msg ) . $/;
     } );
-print "end_promise: $end_promise\n";
 
     _finish_http_curl($end_promise);
-use Data::Dumper;
-print STDERR Dumper( after_finish => $AnyEvent::Loop::FDS_AR );
 
     return;
 }

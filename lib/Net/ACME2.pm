@@ -396,19 +396,18 @@ sub create_order {
 
     $self->_require_key_id(\%opts);
 
-return $self->_post( 'newOrder', \%opts )
-#    return $self->_depromise_if_sync(
-#        $self->_post( 'newOrder', \%opts )->then( sub {
-#            my ($resp) = @_;
-#
-#            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
-#
-#            return Net::ACME2::Order->new(
-#                id => $resp->header('location'),
-#                %{ $resp->content_struct() },
-#            );
-#        } ),
-#    );
+    return $self->_depromise_if_sync(
+        $self->_post( 'newOrder', \%opts )->then( sub {
+            my ($resp) = @_;
+
+            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+
+            return Net::ACME2::Order->new(
+                id => $resp->header('location'),
+                %{ $resp->content_struct() },
+            );
+        } ),
+    );
 }
 
 #----------------------------------------------------------------------
@@ -603,35 +602,23 @@ sub _key_thumbprint {
 sub _get_directory {
     my ($self) = @_;
 
-    my $promise;
-
-    $self->{'_directory'} ||= undef;
-    my $dir_sr = \$self->{'_directory'};
-
-    if ($self->{'_directory'}) {
-        $promise = Promise::ES6->resolve($self->{'_directory'});
-    }
-    else {
+    return $self->{'_directory_promise'} ||= do {
         my $dir_path = $self->DIRECTORY_PATH();
-        $promise = $self->{'_directory_promise'} ||= do {
-            $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
-                return $$dir_sr = shift()->content_struct();
-            } );
-        };
-    }
 
-    my $http = $self->{'_http'};
+        my $http = $self->{'_http'};
 
-    return $promise->then( sub {
-        my $dir_hr = $$dir_sr;
-        my $new_nonce_url = $dir_hr->{'newNonce'} or do {
-            _die_generic('Directory lacks “newNonce”.');
-        };
+        my $p = $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
+            my $dir_hr = shift()->content_struct();
 
-        $http->set_new_nonce_url( $new_nonce_url );
+            my $new_nonce_url = $dir_hr->{'newNonce'} or do {
+                _die_generic('Directory lacks “newNonce”.');
+            };
 
-        return $dir_hr;
-    } );
+            $http->set_new_nonce_url( $new_nonce_url );
+
+            return $dir_hr;
+        } );
+    };
 }
 
 sub _require_key_id {
