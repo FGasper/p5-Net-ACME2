@@ -3,6 +3,9 @@ Revision history for Perl module Net::ACME2
 0.40
 - Provide an EXPERIMENTAL mechanism for asynchronous HTTP.
 
+0.35 13 April 2020
+- Fix mis-parse of subproblem identifiers in to_string().
+
 0.34 13 March 2020
 - Fix warning in error objects if there is no “status”.
 

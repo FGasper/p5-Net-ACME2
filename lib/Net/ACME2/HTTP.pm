@@ -22,6 +22,7 @@ use JSON ();
 
 use Net::ACME2::Error          ();
 use Net::ACME2::HTTP::Response ();
+use Net::ACME2::PromiseUtil    ();
 use Net::ACME2::X              ();
 
 use constant _CONTENT_TYPE => 'application/jose+json';
@@ -38,7 +39,11 @@ our $verify_SSL = 1;
 sub new {
     my ( $class, %opts ) = @_;
 
+    my $is_sync;
+
     $opts{'ua'} ||= do {
+        $is_sync = 1;
+
         require Net::ACME2::HTTP_Tiny;
         Net::ACME2::HTTP_Tiny->new( verify_SSL => $verify_SSL );
     };
@@ -47,6 +52,7 @@ sub new {
         _ua       => $opts{'ua'},
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
+        _sync_io => $is_sync,
     }, $class;
 
     return bless $self, $class;
@@ -113,56 +119,62 @@ sub _post {
     # without “key”.
     die "Constructor needed “key” to do POST! ($url)" if !$self->{'_acme_key'};
 
+    # TODO FIXME
     my $retries_left = $_MAX_RETRIES;
 
-    return $self->_create_jwt( $jwt_method, $url, $data )->then( sub {
-        my $jws = shift;
+    return Net::ACME2::PromiseUtil::then(
+        $self->_create_jwt( $jwt_method, $url, $data ),
+        sub {
+            my $jws = shift;
 
-        local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
+            local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
 
-        return $self->_request_and_set_last_nonce(
-            'POST',
-            $url,
-            {
-                content => $jws,
-                headers => {
-                    'content-type' => _CONTENT_TYPE,
+            return Net::ACME2::PromiseUtil::do_and_catch(
+                sub {
+                    $self->_request_and_set_last_nonce(
+                    'POST',
+                    $url,
+                    {
+                        content => $jws,
+                        headers => {
+                            'content-type' => _CONTENT_TYPE,
+                        },
+                    },
+                    $opts_hr || (),
+                ),
+                sub {
+                    my ($err) = @_;
+
+                    my $resp;
+
+                    if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
+                        if (!$retries_left) {
+                            warn( "$url: Received “badNonce” error, and no retries left!\n" );
+                        }
+                        elsif ($self->{'_last_nonce'}) {
+
+                            # This scenario seems worth a warn() because even if the
+                            # retry succeeds, something probably went awry somewhere.
+
+                            warn( "$url: Received “badNonce” error! Retrying ($retries_left left) …\n" );
+
+                            $retries_left--;
+
+                            # NB: The success of this depends on our having recorded
+                            # the Replay-Nonce from the last response.
+                            return $self->_post(@_[ 1 .. $#_ ]);
+                        }
+                        else {
+                            warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
+                        }
+                    }
+
+                    local $@ = $err;
+                    die;
                 },
-            },
-            $opts_hr || (),
-        )->catch(
-            sub {
-                my ($err) = @_;
-
-                my $resp;
-
-                if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
-                    if (!$retries_left) {
-                        warn( "$url: Received “badNonce” error, and no retries left!\n" );
-                    }
-                    elsif ($self->{'_last_nonce'}) {
-
-                        # This scenario seems worth a warn() because even if the
-                        # retry succeeds, something probably went awry somewhere.
-
-                        warn( "$url: Received “badNonce” error! Retrying ($retries_left left) …\n" );
-
-                        $retries_left--;
-
-                        # NB: The success of this depends on our having recorded
-                        # the Replay-Nonce from the last response.
-                        return $self->_post(@_[ 1 .. $#_ ]);
-                    }
-                    else {
-                        warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
-                    }
-                }
-
-                local $@ = $err;
-                die;
-            }
-        );
-    } );
+            );
+        },
+    );
 }
 
 # promise
@@ -190,10 +202,8 @@ sub _consume_nonce_in_headers {
 sub _request {
     my ( $self, $type, @args ) = @_;
 
-    my $promise = $self->_ua_request( $type, @args );
-
-
-    return $promise->then(
+    return Net::ACME2::PromiseUtil::then(
+        $self->_ua_request( $type, @args ),
         sub {
             return Net::ACME2::HTTP::Response->new($_[0]);
         },
@@ -204,24 +214,27 @@ sub _request {
 sub _request_and_set_last_nonce {
     my ( $self, $type, $url, @args ) = @_;
 
-    return $self->_request( $type, $url, @args )->then( sub {
-        my ($resp) = @_;
+    return Net::ACME2::PromiseUtil::then(
+        $self->_request( $type, $url, @args ),
+        sub {
+            my ($resp) = @_;
 
-        # NB: ACME’s replay protection works thus:
-        #   - each server response includes a nonce
-        #   - each request must include ONE of the nonces that have been sent
-        #   - once used, a nonce can’t be reused
-        #
-        # This is subtly different from what was originally in mind (i.e., that
-        # each request must use the most recently sent nonce). It implies that
-        # GETs do not need to send nonces, though each GET will *receive* a
-        # nonce that may be used.
-        $self->{'_last_nonce'} = $resp->header($_NONCE_HEADER) or do {
-            die Net::ACME2::X->create('Generic', "Received no $_NONCE_HEADER from $url!");
-        };
+            # NB: ACME’s replay protection works thus:
+            #   - each server response includes a nonce
+            #   - each request must include ONE of the nonces that have been sent
+            #   - once used, a nonce can’t be reused
+            #
+            # This is subtly different from what was originally in mind (i.e., that
+            # each request must use the most recently sent nonce). It implies that
+            # GETs do not need to send nonces, though each GET will *receive* a
+            # nonce that may be used.
+            $self->{'_last_nonce'} = $resp->header($_NONCE_HEADER) or do {
+                die Net::ACME2::X->create('Generic', "Received no $_NONCE_HEADER from $url!");
+            };
 
-        return $resp;
-    } );
+            return $resp;
+        },
+    );
 }
 
 # promise
@@ -292,15 +305,16 @@ sub _create_jwt {
         );
     };
 
-    my $promise;
-    if ($self->{'_last_nonce'}) {
-        $promise = Promise::ES6->resolve(undef);
-    }
-    else {
-        $promise = $self->_get_first_nonce();
+    my $maybe_promise = $self->{'_last_nonce'} ? undef : $self->_get_first_nonce();
+
+    if (!$self->{'_sync_io'}) {
+        $maybe_promise = Promise::ES6->resolve($maybe_promise);
     }
 
-    return $promise->then($todo_after_first_nonce_cr);
+    return Net::ACME2::PromiseUtil::then(
+        $maybe_promise,
+        $todo_after_first_nonce_cr,
+    );
 }
 
 1;

@@ -4,7 +4,7 @@ package Net::ACME2::HTTP_Tiny;
 
 =head1 NAME
 
-Net::ACME2::HTTP_Tiny - HTTP client for Net::ACME
+Net::ACME2::HTTP_Tiny - Synchronous HTTP client for Net::ACME
 
 =head1 SYNOPSIS
 
@@ -47,8 +47,6 @@ use strict;
 use warnings;
 
 use parent qw( HTTP::Tiny );
-
-use Promise::ES6 ();
 
 use HTTP::Tiny::UA::Response ();
 
@@ -95,16 +93,11 @@ sub request {
 
     # NB: HTTP::Tiny clobbers $@. The clobbering is useless since the
     # error is in the $resp variable already. Clobbering also risks
-    # action-at-a-distance problems. It’s not a problem anymore, though,
-    # because Promise::ES6 localizes $@.
+    # action-at-a-distance problems.
 
-    return Promise::ES6->new( sub {
-        my ($res) = @_;
+    my $resp = _base_request( $self, $method, $url, $args_hr || () );
 
-        my $resp = _base_request( $self, $method, $url, $args_hr || () );
-
-        $res->( Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp) );
-    } );
+    return Net::ACME2::HTTP::Convert::http_tiny_to_net_acme2($method, $resp);
 }
 
 1;

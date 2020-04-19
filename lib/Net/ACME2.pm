@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 our $VERSION;
-BEGIN { $VERSION = '0.34' }
+BEGIN { $VERSION = '0.40_01' }
 
 =encoding utf-8
 
@@ -190,6 +190,7 @@ use Net::ACME2::AccountKey;
 use Net::ACME2::HTTP;
 use Net::ACME2::Order;
 use Net::ACME2::Authorization;
+use Net::ACME2::PromiseUtil;
 
 use constant {
     _HTTP_OK => 200,
@@ -255,7 +256,7 @@ sub _new_without_key_check {
         _key  => $opts{'key'},
         _key_id => $opts{'key_id'},
         _directory => $opts{'directory'},
-        _http_ua => $opts{'async_ua'},
+        _async_ua => $opts{'async_ua'},
     };
 
     bless $self, $class;
@@ -294,7 +295,7 @@ Throws an exception if C<async_ua> was given to C<new()>.
 sub http_timeout {
     my $self = shift;
 
-    die 'Don’t call in asynchronous mode!' if $self->{'_http_ua'};
+    die 'Don’t call in asynchronous mode!' if $self->{'_async_ua'};
 
     return $self->{'_http'}->timeout(@_);
 }
@@ -316,8 +317,9 @@ sub get_terms_of_service {
         $self = $self->_new_without_key_check();
     }
 
-    return $self->_depromise_if_sync(
-        $self->_get_directory()->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_get_directory(),
+        sub {
             my $dir = shift;
 
             # Exceptions here indicate an ACME violation and should be
@@ -326,7 +328,7 @@ sub get_terms_of_service {
             $url = $url->{'termsOfService'} or _die_generic('No “termsOfService” in directory metadata!');
 
             return $url;
-        } ),
+        },
     );
 }
 
@@ -353,8 +355,9 @@ sub create_account {
         ($opts{$name} &&= JSON::true()) ||= JSON::false();
     }
 
-    return $self->_depromise_if_sync(
-        $self->_post( 'newAccount', \%opts )->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post( 'newAccount', \%opts ),
+        sub {
             my ($resp) = @_;
 
             $self->{'_key_id'} = $resp->header('location');
@@ -375,7 +378,7 @@ sub create_account {
             }
 
             return 1;
-        } ),
+        },
     );
 }
 
@@ -396,8 +399,9 @@ sub create_order {
 
     $self->_require_key_id(\%opts);
 
-    return $self->_depromise_if_sync(
-        $self->_post( 'newOrder', \%opts )->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post( 'newOrder', \%opts ),
+        sub {
             my ($resp) = @_;
 
             $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
@@ -406,7 +410,7 @@ sub create_order {
                 id => $resp->header('location'),
                 %{ $resp->content_struct() },
             );
-        } ),
+        },
     );
 }
 
@@ -424,15 +428,16 @@ The URL is as given by L<Net::ACME2::Order>’s C<authorizations()> method.
 sub get_authorization {
     my ($self, $id) = @_;
 
-    return $self->_depromise_if_sync(
-        $self->_post_as_get($id)->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get($id),
+        sub {
             my $resp = shift;
 
             return Net::ACME2::Authorization->new(
                 id => $id,
                 %{ $resp->content_struct() },
             );
-        } ),
+        },
     );
 }
 
@@ -471,13 +476,14 @@ Signal to the ACME server that the CHALLENGE is ready.
 sub accept_challenge {
     my ($self, $challenge_obj) = @_;
 
-    return $self->_depromise_if_sync(
+    return Net::ACME2::PromiseUtil::then(
         $self->_post_url(
             $challenge_obj->url(),
             {
                 keyAuthorization => $self->make_key_authorization($challenge_obj),
             },
-        )->then( sub { undef } ),
+        ),
+        sub { undef },
     );
 }
 
@@ -522,13 +528,14 @@ sub finalize_order {
 
     $csr = MIME::Base64::encode_base64url($csr_der);
 
-    return $self->_depromise_if_sync(
+    return Net::ACME2::PromiseUtil::then(
         $self->_post_url(
             $order_obj->finalize(),
             {
                 csr => $csr,
             },
-        )->then( sub {
+        ),
+        sub {
             my $post = shift;
 
             my $content = $post->content_struct();
@@ -536,7 +543,7 @@ sub finalize_order {
             $order_obj->update($content);
 
             return $order_obj->status();
-        } ),
+        },
     );
 }
 
@@ -565,33 +572,15 @@ protocol specification for details about this format.
 sub get_certificate_chain {
     my ($self, $order) = @_;
 
-    return $self->_depromise_if_sync(
-        $self->_post_as_get( $order->certificate() )->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get( $order->certificate() ),
+        sub {
             return shift()->content();
-        } )
+        },
     );
 }
 
 #----------------------------------------------------------------------
-
-sub _depromise_if_sync {
-    my ($self, $promise) = @_;
-
-    return $promise if $self->{'_http_ua'};
-
-    my ($val, $die_yn, $err);
-    $promise->then(
-        sub { $val = shift },
-        sub { $die_yn = 1; $err = shift },
-    );
-
-    if ($die_yn) {
-        local $@ = $err;
-        die;
-    }
-
-    return $val;
-}
 
 sub _key_thumbprint {
     my ($self) = @_;
@@ -607,17 +596,20 @@ sub _get_directory {
 
         my $http = $self->{'_http'};
 
-        $self->{'_http'}->get("https://$self->{'_host'}$dir_path")->then( sub {
-            my $dir_hr = shift()->content_struct();
+        Net::ACME2::PromiseUtil::then(
+            $self->{'_http'}->get("https://$self->{'_host'}$dir_path"),
+            sub {
+                my $dir_hr = shift()->content_struct();
 
-            my $new_nonce_url = $dir_hr->{'newNonce'} or do {
-                _die_generic('Directory lacks “newNonce”.');
-            };
+                my $new_nonce_url = $dir_hr->{'newNonce'} or do {
+                    _die_generic('Directory lacks “newNonce”.');
+                };
 
-            $http->set_new_nonce_url( $new_nonce_url );
+                $http->set_new_nonce_url( $new_nonce_url );
 
-            return $dir_hr;
-        } );
+                return $dir_hr;
+            },
+        );
     };
 }
 
@@ -634,8 +626,9 @@ sub _require_key_id {
 sub _poll_order_or_authz {
     my ($self, $order_or_authz_obj) = @_;
 
-    return $self->_depromise_if_sync(
-        $self->_post_as_get( $order_or_authz_obj->id() )->then( sub {
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get( $order_or_authz_obj->id() ),
+        sub {
             my $get = shift;
 
             my $content = $get->content_struct();
@@ -643,7 +636,7 @@ sub _poll_order_or_authz {
             $order_or_authz_obj->update($content);
 
             return $order_or_authz_obj->status();
-        } ),
+        },
     );
 }
 
@@ -659,7 +652,7 @@ sub _set_http {
     $self->{'_http'} = Net::ACME2::HTTP->new(
         key => $self->{'_key'} && $self->_key_obj(),
         key_id => $self->{'_key_id'},
-        ua => $self->{'_http_ua'},
+        ua => $self->{'_async_ua'},
     );
 
     return;
@@ -673,15 +666,18 @@ sub _post {
     my $post_method;
     $post_method = 'post_full_jwt' if grep { $link_name eq $_ } FULL_JWT_METHODS();
 
-    return $self->_get_directory()->then( sub {
-        my $dir_hr = shift;
+    return Net::ACME2::PromiseUtil::then(
+        $self->_get_directory(),
+        sub {
+            my $dir_hr = shift;
 
-        # Since the $link_name will come from elsewhere in this module
-        # there really shouldn’t be an error here, but just in case.
-        my $url = $dir_hr->{$link_name} or _die_generic("Unknown link name: “$link_name”");
+            # Since the $link_name will come from elsewhere in this module
+            # there really shouldn’t be an error here, but just in case.
+            my $url = $dir_hr->{$link_name} or _die_generic("Unknown link name: “$link_name”");
 
-        return $self->_post_url( $url, $data, $post_method );
-    } );
+            return $self->_post_url( $url, $data, $post_method );
+        },
+    );
 }
 
 sub _post_as_get {
@@ -699,9 +695,12 @@ sub _post_url {
 
     #Do this in case we haven’t initialized the directory yet.
     #Initializing the directory is necessary to get a nonce.
-    return $self->_get_directory()->then( sub {
-        return $http->$post_method( $url, $data );
-    } );
+    return Net::ACME2::PromiseUtil::then(
+        $self->_get_directory(),
+        sub {
+            return $http->$post_method( $url, $data );
+        },
+    );
 }
 
 sub _die_generic {
