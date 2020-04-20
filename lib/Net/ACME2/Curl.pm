@@ -47,6 +47,8 @@ use Net::Curl::Easy ();
 use Net::ACME2 ();
 use Net::ACME2::HTTP::Convert ();
 
+use constant _HTTP_TINY_INTERNAL_EXCEPTION_REASON => 'Internal Exception';
+
 #----------------------------------------------------------------------
 
 =head1 METHODS
@@ -110,7 +112,7 @@ sub request {
                 success => 0,
                 url => $easy->getinfo( Net::Curl::Easy::CURLINFO_EFFECTIVE_URL() ),
                 status => 599,
-                reason => q<>,
+                reason => _HTTP_TINY_INTERNAL_EXCEPTION_REASON,
                 content => q<> . shift(),
                 headers => {},
             };
