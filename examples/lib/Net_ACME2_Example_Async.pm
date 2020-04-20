@@ -17,7 +17,7 @@ use Crypt::Perl::PKCS10 ();
 use constant _PROMISER_CLASS => 'Net::Curl::Promiser::AnyEvent';
 
 use Promise::ES6;
-# Promise::ES6::use_event('AnyEvent');
+Promise::ES6::use_event('AnyEvent');
 
 die if !eval( 'require ' . _PROMISER_CLASS() );
 

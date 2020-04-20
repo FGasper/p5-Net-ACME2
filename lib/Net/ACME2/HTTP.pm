@@ -207,7 +207,7 @@ sub _consume_nonce_in_headers {
 }
 
 sub _xform_http_error {
-    my $exc = shift;
+    my ($self, $exc) = @_;
 
     if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
 
@@ -246,7 +246,7 @@ sub _request {
         sub {
             return Net::ACME2::HTTP::Response->new($_[0]);
         },
-        \&_xform_http_error,
+        sub { $self->_xform_http_error(@_) },
     );
 }
 
