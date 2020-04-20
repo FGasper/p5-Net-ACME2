@@ -117,6 +117,8 @@ sub post_key_id {
 sub _post {
     my ( $self, $jwt_method, $url, $data, $opts_hr ) = @_;
 
+    die "Need JWT method!" if !$jwt_method;
+
     # Needed now that the constructor allows instantiation
     # without “key”.
     die "Constructor needed “key” to do POST! ($url)" if !$self->{'_acme_key'};
@@ -149,9 +151,6 @@ sub _post {
                 },
                 sub {
                     my ($err) = @_;
-print "==== in catch block\n";
-use Data::Dumper;
-print STDERR Dumper( $err );
 
                     my $resp;
 
@@ -170,7 +169,7 @@ print STDERR Dumper( $err );
 
                             # NB: The success of this depends on our having recorded
                             # the Replay-Nonce from the last response.
-                            return $self->_post(@_[ 1 .. $#_ ]);
+                            return $self->_post( $jwt_method, $url, $data, $opts_hr );
                         }
                         else {
                             warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
@@ -207,16 +206,47 @@ sub _consume_nonce_in_headers {
     return;
 }
 
+sub _xform_http_error {
+    my $exc = shift;
+
+    if ( eval { $exc->isa('Net::ACME2::X::HTTP::Protocol') } ) {
+
+        $self->_consume_nonce_in_headers( $exc->get('headers') );
+
+        #If the exception is able to be made into a Net::ACME2::Error,
+        #then do so to get a nicer error message.
+        my $acme_error = eval {
+            Net::ACME2::Error->new(
+                %{ JSON::decode_json( $exc->get('content') ) },
+            );
+        };
+
+        if ($acme_error) {
+            die Net::ACME2::X->create(
+                'ACME',
+                {
+                    http => $exc,
+                    acme => $acme_error,
+                },
+            );
+        }
+    }
+
+    $@ = $exc;
+    die;
+}
+
 # promise
 # overridden in tests
 sub _request {
     my ( $self, $type, @args ) = @_;
 
-    return Net::ACME2::PromiseUtil::then(
-        $self->_ua_request( $type, @args ),
+    return Net::ACME2::PromiseUtil::do_then_catch(
+        sub { $self->_ua_request( $type, @args ) },
         sub {
             return Net::ACME2::HTTP::Response->new($_[0]);
         },
+        \&_xform_http_error,
     );
 }
 
@@ -310,9 +340,9 @@ sub _create_jwt {
                 die "No nonce even after _get_first_nonce()!";
             };
 
-            # For testing badNonce retry … TODO FIXME:
+            # For testing badNonce retry …
             # $nonce = reverse($nonce) if $self->{'_retries_left'};
-            $nonce = reverse($nonce);
+            # $nonce = reverse($nonce);
 
             return $self->{'_jwt_maker'}->$jwt_method(
                 key_id => $self->{'_key_id'},
