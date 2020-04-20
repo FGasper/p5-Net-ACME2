@@ -52,8 +52,10 @@ sub new {
         _ua       => $opts{'ua'},
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
+        _retries_left => $_MAX_RETRIES,
         _sync_io => $is_sync,
     }, $class;
+die "no retries?" if !$_MAX_RETRIES;
 
     return bless $self, $class;
 }
@@ -119,36 +121,42 @@ sub _post {
     # without “key”.
     die "Constructor needed “key” to do POST! ($url)" if !$self->{'_acme_key'};
 
-    # TODO FIXME
-    my $retries_left = $_MAX_RETRIES;
-
     return Net::ACME2::PromiseUtil::then(
         $self->_create_jwt( $jwt_method, $url, $data ),
         sub {
             my $jws = shift;
 
-            local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
+            # local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
 
-            return Net::ACME2::PromiseUtil::do_and_catch(
+            return Net::ACME2::PromiseUtil::do_then_catch(
                 sub {
-                    $self->_request_and_set_last_nonce(
-                    'POST',
-                    $url,
-                    {
-                        content => $jws,
-                        headers => {
-                            'content-type' => _CONTENT_TYPE,
+                    return $self->_request_and_set_last_nonce(
+                        'POST',
+                        $url,
+                        {
+                            content => $jws,
+                            headers => {
+                                'content-type' => _CONTENT_TYPE,
+                            },
                         },
-                    },
-                    $opts_hr || (),
-                ),
+                        $opts_hr || (),
+                    ),
+                },
+                sub {
+                    $self->{'_retries_left'} = $_MAX_RETRIES;
+
+                    return shift;
+                },
                 sub {
                     my ($err) = @_;
+print "==== in catch block\n";
+use Data::Dumper;
+print STDERR Dumper( $err );
 
                     my $resp;
 
                     if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
-                        if (!$retries_left) {
+                        if (!$self->{'_retries_left'}) {
                             warn( "$url: Received “badNonce” error, and no retries left!\n" );
                         }
                         elsif ($self->{'_last_nonce'}) {
@@ -156,9 +164,9 @@ sub _post {
                             # This scenario seems worth a warn() because even if the
                             # retry succeeds, something probably went awry somewhere.
 
-                            warn( "$url: Received “badNonce” error! Retrying ($retries_left left) …\n" );
+                            warn( "$url: Received “badNonce” error! Retrying ($self->{'_retries_left'} left) …\n" );
 
-                            $retries_left--;
+                            $self->{'_retries_left'}--;
 
                             # NB: The success of this depends on our having recorded
                             # the Replay-Nonce from the last response.
@@ -168,6 +176,8 @@ sub _post {
                             warn( "$url: Received “badNonce” without a Replay-Nonce! (Server violates RFC 8555/6.5!) Cannot retry …" );
                         }
                     }
+
+                    $self->{'_retries_left'} = $_MAX_RETRIES;
 
                     local $@ = $err;
                     die;
@@ -250,7 +260,7 @@ sub _get_first_nonce {
     return $self->_request_and_set_last_nonce( 'HEAD', $url );
 }
 
-# promise
+# promise OR JWS itself.
 sub _create_jwt {
     my ( $self, $jwt_method, $url, $data ) = @_;
 
@@ -283,37 +293,36 @@ sub _create_jwt {
         );
     };
 
-    my $todo_after_first_nonce_cr = sub {
-
-        # Ideally we’d wait until we’ve confirmed that this JWT reached the
-        # server to delete the local nonce, but at this point a failure to
-        # reach the server seems pretty edge-case-y. Even if that happens,
-        # we’ll just request another nonce next time, so no big deal.
-        my $nonce = delete $self->{'_last_nonce'};
-
-        # For testing badNonce retry … TODO FIXME:
-        # $nonce = reverse($nonce) if $self->{'_retries_left'};
-        # $nonce = reverse($nonce);
-
-        return $self->{'_jwt_maker'}->$jwt_method(
-            key_id => $self->{'_key_id'},
-            payload => $data,
-            extra_headers => {
-                nonce => $nonce,
-                url => $url,
-            },
-        );
-    };
-
+    # In sync mode, we just throw away this value.
+    # In async mode the undef is ignored, and a promise is honored.
     my $maybe_promise = $self->{'_last_nonce'} ? undef : $self->_get_first_nonce();
-
-    if (!$self->{'_sync_io'}) {
-        $maybe_promise = Promise::ES6->resolve($maybe_promise);
-    }
 
     return Net::ACME2::PromiseUtil::then(
         $maybe_promise,
-        $todo_after_first_nonce_cr,
+        sub {
+
+            # Ideally we’d wait until we’ve confirmed that this JWT reached
+            # the server to delete the local nonce, but at this point a
+            # failure to reach the server seems pretty edge-case-y. Even if
+            # that happens, we’ll just request another nonce next time,
+            # so no big deal.
+            my $nonce = delete $self->{'_last_nonce'} or do {
+                die "No nonce even after _get_first_nonce()!";
+            };
+
+            # For testing badNonce retry … TODO FIXME:
+            # $nonce = reverse($nonce) if $self->{'_retries_left'};
+            $nonce = reverse($nonce);
+
+            return $self->{'_jwt_maker'}->$jwt_method(
+                key_id => $self->{'_key_id'},
+                payload => $data,
+                extra_headers => {
+                    nonce => $nonce,
+                    url => $url,
+                },
+            );
+        },
     );
 }
 

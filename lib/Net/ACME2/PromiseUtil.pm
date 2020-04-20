@@ -13,8 +13,8 @@ sub then {
     return $todo_cr->($maybe_promise);
 }
 
-sub do_and_catch {
-    my ($try_cr, $catch_cr) = @_;
+sub do_then_catch {
+    my ($try_cr, $then_cr, $catch_cr) = @_;
 
     my $maybe_promise;
 
@@ -25,14 +25,14 @@ sub do_and_catch {
 
     if ($ok) {
         if (UNIVERSAL::can($maybe_promise, 'then')) {
-            $maybe_promise->catch($catch_cr);
+            return $maybe_promise->then($then_cr, $catch_cr);
+        }
+        else {
+            return $then_cr->($maybe_promise);
         }
     }
-    else {
-        $catch_cr->($maybe_promise);
-    }
 
-    return;
+    return $catch_cr->($err);
 }
 
 1;

@@ -14,9 +14,12 @@ use lib "$FindBin::Bin/../lib";
 use Crypt::Perl::ECDSA::Generate ();
 use Crypt::Perl::PKCS10 ();
 
-use constant _PROMISE_CLASS => 'Net::Curl::Promiser::AnyEvent';
+use constant _PROMISER_CLASS => 'Net::Curl::Promiser::AnyEvent';
 
-die if !eval( 'require ' . _PROMISE_CLASS() );
+use Promise::ES6;
+# Promise::ES6::use_event('AnyEvent');
+
+die if !eval( 'require ' . _PROMISER_CLASS() );
 
 use Net::ACME2::Curl ();
 
@@ -51,6 +54,30 @@ sub _finish_http_curl {
     return;
 }
 
+sub _after_delay {
+    my ($seconds) = @_;
+
+    if ( _PROMISER_CLASS =~ m<AnyEvent> ) {
+        return Promise::ES6->new( sub {
+            my ($res) = @_;
+
+            my $w;
+            $w = AnyEvent->timer(
+                after => $seconds,
+                cb => sub {
+                    undef $w;
+                    $res->();
+                },
+            );
+        } );
+    }
+    elsif ( _PROMISER_CLASS =~ m<Mojo> ) {
+        return Mojo::Promise->timer($seconds => undef);
+    }
+
+    die ('Can’t delay: ' . _PROMISER_CLASS);
+}
+
 sub run {
     my ($class) = @_;
 
@@ -58,7 +85,7 @@ sub run {
 
     my $_test_key = $_CACHED_TEST_KEY_PEM || Crypt::Perl::ECDSA::Generate::by_name(_ECDSA_CURVE())->to_pem_with_curve_name();
 
-    my $promiser = _PROMISE_CLASS()->new();
+    my $promiser = _PROMISER_CLASS()->new();
 
     my $acme = Net::ACME2::LetsEncrypt->new(
         environment => 'staging',
@@ -107,7 +134,7 @@ sub run {
 
     my $end_promise = $key_id_promise->then( sub {
         @domains = $class->_get_domains();
-        print "Creating order …\n";
+        print "Creating order …$/";
 
         return $acme->create_order(
             identifiers => [ map { { type => 'dns', value => $_ } } @domains ],
@@ -140,12 +167,15 @@ sub run {
         my @promises;
 
         for my $authz (@$authzs_ar) {
-            next if $authz->status() eq 'valid';
+            my $name = $authz->identifier()->{'value'};
+
+            if ($authz->status() eq 'valid') {
+                print "$/“$name” has passed validation.$/";
+            }
 
             push @promises, $acme->poll_authorization($authz)->then( sub {
                 my $status = shift;
 
-                my $name = $authz->identifier()->{'value'};
                 substr($name, 0, 0, '*.') if $authz->wildcard();
 
                 if ($status eq 'valid') {
@@ -167,11 +197,10 @@ sub run {
         }
 
         if (@promises) {
-            print "Waiting 1 second before polling authzs again …$/";
-
-            sleep 1;
-
-            return Promise::ES6->all(\@promises)->then(__SUB__);
+            return Promise::ES6->all(\@promises)->then( sub {
+                print "Waiting 1 second before polling authz(s) again …$/";
+                return _after_delay(1);
+            } )->then(__SUB__);
         }
 
         return undef;
@@ -180,13 +209,15 @@ sub run {
 
         print "Finalizing order …$/";
 
+        my $finalize_cr = __SUB__;
+
         return $acme->finalize_order($order, $csr)->then( sub {
             if ($order->status() ne 'valid') {
                 print "Waiting 1 second before polling order again …$/";
 
-                sleep 1;
-
-                return $acme->poll_order($order)->then(__SUB__);
+                return _after_delay(1)->then( sub {
+                    return $acme->poll_order($order)->then($finalize_cr);
+                } );
             }
         } );
     } )->then( sub {
