@@ -214,6 +214,9 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
     elsif ($method ne 'GET') {
         $easy->setopt( Net::Curl::Easy::CURLOPT_CUSTOMREQUEST(), $method );
     }
+    else {
+        die "Unknown HTTP method: $method";
+    }
 
     return $easy;
 }

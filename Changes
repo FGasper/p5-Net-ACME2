@@ -1,7 +1,9 @@
 Revision history for Perl module Net::ACME2
 
 0.40
-- Provide an EXPERIMENTAL mechanism for asynchronous HTTP.
+- Provide an EXPERIMENTAL mechanism for asynchronous HTTP. This involved
+  a significant refactor of the internals, which may affect synchronous
+  operation.
 
 0.35 13 April 2020
 - Fix mis-parse of subproblem identifiers in to_string().
