@@ -4,7 +4,9 @@ use strict;
 use warnings;
 
 our $VERSION;
-BEGIN { $VERSION = '0.40_02' }
+BEGIN {
+    $VERSION = '0.40_02';
+}
 
 =encoding utf-8
 

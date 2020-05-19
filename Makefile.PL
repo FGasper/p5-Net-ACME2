@@ -7,6 +7,7 @@ WriteMakefile(
     NAME         => 'Net::ACME2',
     AUTHOR       => 'Felipe Gasper',
     ABSTRACT_FROM => 'lib/Net/ACME2.pm',
+    VERSION_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
     MIN_PERL_VERSION => '5.10.0',
     PREREQ_PM    => {
