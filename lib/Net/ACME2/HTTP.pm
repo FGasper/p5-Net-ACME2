@@ -55,7 +55,6 @@ sub new {
         _retries_left => $_MAX_RETRIES,
         _sync_io => $is_sync,
     }, $class;
-die "no retries?" if !$_MAX_RETRIES;
 
     return bless $self, $class;
 }

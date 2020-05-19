@@ -27,13 +27,10 @@ This module wraps L<HTTP::Tiny>, thus:
 
 =over
 
-=item * Make C<request()> (and, thus, C<get()>, C<post()>, etc.)
-return a (non-pending) promise.
-
 =item * Duplicate the work of C<HTTP::Tiny::UA> without the
 dependency on L<superclass> (which brings in a mess of other undesirables).
-Thus, the promises that C<request()> and related methods return
-resolve to instances of C<HTTP::Tiny::UA::Response> rather than simple hashes.
+Thus, the returns from C<request()> and related methods
+are instances of C<HTTP::Tiny::UA::Response> rather than simple hashes.
 
 =item * Verify remote SSL connections, and always C<die()> if
 either the network connection fails or the protocol indicates an error
